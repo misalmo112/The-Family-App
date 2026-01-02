@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: family_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: family_app
+      POSTGRES_USER: family_user
+      POSTGRES_PASSWORD: family_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U family_user -d family_app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+

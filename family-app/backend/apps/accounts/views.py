@@ -1,0 +1,2 @@
+# Views for accounts app
+
