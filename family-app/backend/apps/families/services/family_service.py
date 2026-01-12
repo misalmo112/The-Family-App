@@ -79,7 +79,7 @@ def create_join_request(family_code, user, chosen_person_id=None, new_person_pay
     if chosen_person_id and new_person_payload:
         raise ValidationError("Cannot provide both chosen_person_id and new_person_payload.")
     
-    # Validate chosen_person exists if provided
+    # Validate chosen_person exists if provided and belongs to the family
     chosen_person = None
     if chosen_person_id:
         Person = apps.get_model('graph', 'Person')
@@ -87,6 +87,8 @@ def create_join_request(family_code, user, chosen_person_id=None, new_person_pay
             chosen_person = Person.objects.get(pk=chosen_person_id)
         except Person.DoesNotExist:
             raise ValidationError(f"Person with id '{chosen_person_id}' does not exist.")
+        if chosen_person.family_id != family.id:
+            raise ValidationError("Chosen person must belong to the requested family.")
     
     # Create join request
     join_request = JoinRequest.objects.create(
@@ -139,6 +141,8 @@ def approve_join_request(join_request_id, reviewer):
     with transaction.atomic():
         # Determine which Person to use
         if join_request.chosen_person:
+            if join_request.chosen_person.family_id != join_request.family_id:
+                raise ValidationError("Chosen person does not belong to this family.")
             person = join_request.chosen_person
         elif join_request.new_person_payload:
             # Create new Person from payload
@@ -147,6 +151,7 @@ def approve_join_request(join_request_id, reviewer):
                 family=join_request.family,
                 first_name=payload.get('first_name', ''),
                 last_name=payload.get('last_name', ''),
+                dob=payload.get('dob'),
                 gender=payload.get('gender', 'UNKNOWN')
             )
         else:

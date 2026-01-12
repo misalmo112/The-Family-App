@@ -133,18 +133,18 @@ family-app/
 - Person node model
 - Relationship types (parent, sibling, spouse, etc.)
 - Graph traversal and queries
-- Relationship topology endpoints (future)
+- Relationship topology endpoints (Phase 2)
 - Family tree visualization data (future)
 
 **Current Implementation:**
-- Empty app structure (models, serializers, views, urls)
+- Person model
+- Relationship model and services (parent/spouse)
+- Relationship creation endpoint: `/api/graph/relationships/`
+- Topology endpoint: `/api/graph/topology/`
 - `services/` directory for graph operations
 
 **Future Additions:**
-- `Person` model
-- `Relationship` model
 - Graph query services
-- Topology calculation endpoints
 
 ### `feed` - Posts and Announcements
 

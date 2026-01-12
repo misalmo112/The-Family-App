@@ -2,6 +2,63 @@
 
 A Django REST Framework backend for a family social network application with JWT authentication and PostgreSQL database.
 
+## Quick Start
+
+Get the project up and running in minutes:
+
+### Backend Setup
+
+1. **Start the database:**
+   ```bash
+   docker compose up -d
+   ```
+
+2. **Set up the backend:**
+   ```bash
+   cd family-app/backend
+   python -m venv venv
+   # Activate venv (Windows PowerShell: .\venv\Scripts\Activate.ps1)
+   pip install -r requirements.txt
+   cp .env.example .env
+   python manage.py migrate
+   python manage.py createsuperuser
+   ```
+
+3. **Start the server:**
+   ```bash
+   python manage.py runserver
+   ```
+
+4. **Verify it's working:**
+   ```bash
+   curl http://127.0.0.1:8000/health/
+   ```
+
+The backend server will be running at `http://127.0.0.1:8000/`
+
+### Frontend Setup (Optional)
+
+1. **Navigate to frontend directory:**
+   ```bash
+   cd family-app/frontend
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
+
+The frontend will be available at `http://localhost:5173/` (or the port shown in the terminal)
+
+**Note:** Make sure the backend is running before starting the frontend. The frontend is configured to connect to `http://127.0.0.1:8000/` by default.
+
+For detailed setup instructions, see the [Setup Instructions](#setup-instructions) section below.
+
 ## Prerequisites
 
 - Python 3.11 or higher
@@ -343,6 +400,56 @@ Expected response:
 ]
 ```
 
+## Phase 2 API Usage
+
+### Creating a Relationship (Admin Only)
+
+Create a relationship between two persons in the same family. `PARENT_OF` is directional; `SPOUSE_OF` creates two edges (A->B and B->A).
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/graph/relationships/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "family_id": 1,
+    "type": "PARENT_OF",
+    "from_person_id": 1,
+    "to_person_id": 2
+  }'
+```
+
+### Fetching Topology
+
+Get the family graph topology (nodes + edges). Spouse edges are not deduped.
+
+```bash
+curl -X GET "http://127.0.0.1:8000/api/graph/topology/?family_id=1&viewer_person_id=1" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+Expected response:
+```json
+{
+  "family_id": 1,
+  "viewer_person_id": 1,
+  "nodes": [
+    {
+      "id": 1,
+      "family": 1,
+      "first_name": "Jane",
+      "last_name": "Smith",
+      "dob": "1985-05-15",
+      "gender": "FEMALE",
+      "created_at": "2024-01-01T12:00:00Z",
+      "updated_at": "2024-01-01T12:00:00Z"
+    }
+  ],
+  "edges": [
+    { "from": 1, "to": 2, "type": "PARENT_OF" }
+  ]
+}
+```
+
 ## Running Tests
 
 Run tests using pytest:
@@ -373,6 +480,122 @@ See `CODE_STRUCTURE.md` for detailed documentation about the project structure, 
 - `POST /api/families/join-requests/<id>/reject/` - Reject a join request (admin only)
 - `GET /api/graph/persons/?family_id=<id>` - List persons in a family
 - `POST /api/graph/persons/` - Create a new person (admin only)
+
+### Phase 2 (Relationships & Topology)
+- `POST /api/graph/relationships/` - Create a relationship (admin only)
+- `GET /api/graph/topology/?family_id=<id>&viewer_person_id=<id>` - Graph topology (nodes + edges)
+
+### Phase 3 (Feed)
+- `POST /api/feed/posts/` - Create a new post
+- `GET /api/feed/?family_id=<id>` - List posts for a family (with pagination)
+
+## Feed API Usage
+
+### Creating a Post
+
+Create a new post in a family feed (family members only):
+
+**Basic post:**
+```bash
+curl -X POST http://127.0.0.1:8000/api/feed/posts/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "family_id": 1,
+    "type": "POST",
+    "text": "Hello everyone! How is everyone doing today?"
+  }'
+```
+
+**Post with author person:**
+```bash
+curl -X POST http://127.0.0.1:8000/api/feed/posts/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "family_id": 1,
+    "author_person_id": 5,
+    "type": "POST",
+    "text": "This is a post from Jane Smith"
+  }'
+```
+
+**Announcement with image:**
+```bash
+curl -X POST http://127.0.0.1:8000/api/feed/posts/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "family_id": 1,
+    "type": "ANNOUNCEMENT",
+    "text": "Family reunion next month!",
+    "image_url": "https://example.com/reunion-poster.jpg"
+  }'
+```
+
+Expected response:
+```json
+{
+  "id": 1,
+  "family_id": 1,
+  "family_name": "The Smith Family",
+  "author_user": "username",
+  "author_person_id": 5,
+  "author_person_name": "Jane Smith",
+  "type": "POST",
+  "text": "Hello everyone! How is everyone doing today?",
+  "image_url": null,
+  "created_at": "2024-01-01T12:00:00Z"
+}
+```
+
+### Listing Posts
+
+List posts for a family with pagination (family members only):
+
+```bash
+curl -X GET "http://127.0.0.1:8000/api/feed/?family_id=1&page=1" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+Expected response:
+```json
+{
+  "results": [
+    {
+      "id": 1,
+      "family_id": 1,
+      "family_name": "The Smith Family",
+      "author_user": "username",
+      "author_person_id": 5,
+      "author_person_name": "Jane Smith",
+      "type": "POST",
+      "text": "Hello everyone! How is everyone doing today?",
+      "image_url": null,
+      "created_at": "2024-01-01T12:00:00Z"
+    }
+  ],
+  "count": 25,
+  "page": 1,
+  "page_size": 20,
+  "total_pages": 2,
+  "has_next": true,
+  "has_previous": false
+}
+```
+
+**Pagination:**
+- Default page size: 20 posts per page
+- Use `page` query parameter to navigate (e.g., `?family_id=1&page=2`)
+- Posts are ordered by newest first (`-created_at`)
+
+**Post Types:**
+- `POST` - Regular post (default)
+- `ANNOUNCEMENT` - Announcement post
+
+**Optional Fields:**
+- `author_person_id` - Associate post with a specific person in the family
+- `image_url` - URL to an image for the post
 
 ## Development Notes
 
