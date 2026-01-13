@@ -22,7 +22,17 @@ const Login = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/families');
+      // Check if user is superadmin
+      const checkSuperadmin = async () => {
+        try {
+          const { getHealth } = await import('../services/admin');
+          await getHealth();
+          navigate('/superadmin');
+        } catch (err) {
+          navigate('/families');
+        }
+      };
+      checkSuperadmin();
     }
   }, [isAuthenticated, navigate]);
 
@@ -35,7 +45,14 @@ const Login = () => {
     setLoading(false);
 
     if (result.success) {
-      navigate('/families');
+      // Check if user is superadmin by trying to access health endpoint
+      try {
+        const { getHealth } = await import('../services/admin');
+        await getHealth();
+        navigate('/superadmin');
+      } catch (err) {
+        navigate('/families');
+      }
     } else {
       setError(result.error || 'Login failed');
     }

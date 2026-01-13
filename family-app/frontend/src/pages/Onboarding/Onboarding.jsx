@@ -20,12 +20,15 @@ import {
   InputAdornment,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import LogoutIcon from '@mui/icons-material/Logout';
 import { useFamily } from '../../context/FamilyContext';
+import { useAuth } from '../../context/AuthContext';
 import { createFamily, submitJoinRequest } from '../../services/families';
 
 const Onboarding = () => {
   const navigate = useNavigate();
   const { setActiveFamily } = useFamily();
+  const { logout } = useAuth();
   const [mode, setMode] = useState(null); // 'create' or 'join'
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -155,6 +158,11 @@ const Onboarding = () => {
     navigate('/pending');
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   // Welcome screen
   if (!mode) {
     return (
@@ -167,8 +175,21 @@ const Onboarding = () => {
             justifyContent: 'center',
             minHeight: '80vh',
             gap: 4,
+            position: 'relative',
           }}
         >
+          <Button
+            variant="outlined"
+            startIcon={<LogoutIcon />}
+            onClick={handleLogout}
+            sx={{
+              position: 'absolute',
+              top: 16,
+              right: 16,
+            }}
+          >
+            Logout
+          </Button>
           <Typography variant="h3" component="h1" gutterBottom align="center">
             Welcome to Family App
           </Typography>
@@ -252,8 +273,21 @@ const Onboarding = () => {
           justifyContent: 'center',
           minHeight: '80vh',
           py: 4,
+          position: 'relative',
         }}
       >
+        <Button
+          variant="outlined"
+          startIcon={<LogoutIcon />}
+          onClick={handleLogout}
+          sx={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+          }}
+        >
+          Logout
+        </Button>
         <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
           <Typography variant="h4" component="h1" gutterBottom align="center">
             {mode === 'create' ? 'Create a Family' : 'Join a Family'}

@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './routes/ProtectedRoute';
+import SuperadminGuard from './routes/SuperadminGuard';
 import AppShell from './components/AppShell';
+import SuperadminLayout from './components/SuperadminLayout';
 import Login from './pages/Login';
 import Families from './pages/Families';
 import Feed from './pages/Feed';
@@ -9,6 +11,13 @@ import Post from './pages/Post';
 import { Onboarding, PendingApproval } from './pages/Onboarding';
 import AdminJoinRequests from './pages/AdminJoinRequests';
 import JoinFamily from './pages/JoinFamily';
+import SuperadminUsers from './pages/Superadmin/Users';
+import SuperadminFamilies from './pages/Superadmin/Families';
+import SuperadminErrorLogs from './pages/Superadmin/ErrorLogs';
+import SuperadminAuditLogs from './pages/Superadmin/AuditLogs';
+import SuperadminFeedback from './pages/Superadmin/Feedback';
+import Dashboard from './pages/Superadmin/Dashboard';
+import Health from './pages/Superadmin/Health';
 
 function App({ RouterComponent = BrowserRouter }) {
   return (
@@ -47,6 +56,22 @@ function App({ RouterComponent = BrowserRouter }) {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/superadmin"
+          element={
+            <SuperadminGuard>
+              <SuperadminLayout />
+            </SuperadminGuard>
+          }
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="health" element={<Health />} />
+          <Route path="users" element={<SuperadminUsers />} />
+          <Route path="families" element={<SuperadminFamilies />} />
+          <Route path="logs/errors" element={<SuperadminErrorLogs />} />
+          <Route path="logs/audit" element={<SuperadminAuditLogs />} />
+          <Route path="feedback" element={<SuperadminFeedback />} />
+        </Route>
       </Routes>
     </RouterComponent>
   );

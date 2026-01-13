@@ -32,6 +32,7 @@ import {
   Logout as LogoutIcon,
   Person as PersonIcon,
   FamilyRestroom as FamilyRestroomIcon,
+  Security as SecurityIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import FamilySwitcher from './Layout/FamilySwitcher';
@@ -45,6 +46,7 @@ const navigationItems = [
   { path: '/post', label: 'Create Post', icon: <AddCircleIcon /> },
   { path: '/join', label: 'Join Family', icon: <GroupAddIcon /> },
   { path: '/admin/join-requests', label: 'Join Requests', icon: <AdminPanelSettingsIcon /> },
+  { path: '/superadmin', label: 'Superadmin', icon: <SecurityIcon /> },
 ];
 
 const AppShell = () => {

@@ -605,3 +605,61 @@ Expected response:
 - Business logic should be placed in `services/` modules within each app
 - API endpoints follow the pattern `/api/<app>/...`
 
+## Superadmin Management
+
+### Granting Superadmin Status
+
+To grant superadmin status to a user, you can use Django shell or admin panel:
+
+**Option 1: Django Shell**
+```bash
+python manage.py shell
+```
+```python
+from apps.accounts.models import User
+user = User.objects.get(username='your_username')
+user.is_superadmin = True
+user.save()
+```
+
+**Option 2: Django Admin Panel**
+1. Navigate to `http://127.0.0.1:8000/admin/`
+2. Go to Users
+3. Select the user
+4. Check the "Is superadmin" checkbox
+5. Save
+
+### Superadmin Endpoints Summary
+
+All endpoints under `/api/admin/` require superadmin status (`is_superadmin=True`).
+
+**Health Check:**
+- `GET /api/admin/health/` - System health check (returns status, time, db status)
+
+**Statistics:**
+- `GET /api/admin/stats/?days=30` - System statistics (users, families, posts, join requests)
+
+**User Management:**
+- `GET /api/admin/users/?q=&page=` - List users with search and pagination
+- `POST /api/admin/users/<id>/disable/` - Disable a user
+- `POST /api/admin/users/<id>/make-superadmin/` - Grant superadmin status
+- `POST /api/admin/users/<id>/revoke-superadmin/` - Revoke superadmin status
+
+**Family Management:**
+- `GET /api/admin/families/?q=&page=` - List families with search and pagination
+- `POST /api/admin/families/<id>/suspend/` - Suspend a family
+- `POST /api/admin/families/<id>/unsuspend/` - Unsuspend a family
+
+**Error Logs:**
+- `GET /api/admin/logs/errors/?q=&page=&since_hours=` - List error logs
+- `GET /api/admin/logs/errors/<id>/` - Get error log detail
+
+**Audit Logs:**
+- `GET /api/admin/logs/audit/?page=&action_type=&entity_type=&family_id=` - List audit logs
+
+**Feedback Management:**
+- `GET /api/admin/feedback/?page=&status=&type=` - List feedback
+- `POST /api/admin/feedback/<id>/status/` - Update feedback status
+
+**Note:** All admin endpoints require JWT authentication with a superadmin user token.
+

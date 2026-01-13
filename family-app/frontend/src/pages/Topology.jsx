@@ -30,9 +30,12 @@ import {
   FamilyRestroom as FamilyRestroomIcon,
   Wc as WcIcon,
   CalendarToday as CalendarIcon,
+  AutoAwesome as AutoAwesomeIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { useFamily } from '../context/FamilyContext';
 import { getPersons, getTopology, createRelationship } from '../services/graph';
+import RelationshipWizard from '../components/RelationshipWizard';
 
 const Topology = () => {
   // Always call hook unconditionally - assumes FamilyProvider exists
@@ -71,6 +74,10 @@ const Topology = () => {
   const [submittingRelationship, setSubmittingRelationship] = useState(false);
   const [relationshipError, setRelationshipError] = useState(null);
   const [relationshipSuccess, setRelationshipSuccess] = useState(false);
+  
+  // Wizard state
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [showAdvancedMode, setShowAdvancedMode] = useState(false);
 
   // Fetch persons when activeFamilyId changes
   useEffect(() => {
@@ -302,21 +309,55 @@ const Topology = () => {
           title="Add Relationship"
           subheader="Connect family members by creating relationships"
           avatar={<AddLinkIcon />}
+          action={
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={showAdvancedMode ? <AutoAwesomeIcon /> : <SettingsIcon />}
+              onClick={() => setShowAdvancedMode(!showAdvancedMode)}
+              sx={{ mr: 1 }}
+            >
+              {showAdvancedMode ? 'Wizard Mode' : 'Advanced Mode'}
+            </Button>
+          }
         />
         <CardContent>
-          {relationshipError && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setRelationshipError(null)}>
-              {relationshipError}
-            </Alert>
-          )}
-          
-          {relationshipSuccess && (
-            <Alert severity="success" sx={{ mb: 2 }} onClose={() => setRelationshipSuccess(false)}>
-              Relationship created successfully!
-            </Alert>
-          )}
+          {!showAdvancedMode ? (
+            <Box>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Use the wizard to add relationships with user-friendly labels like "father", "mother", "uncle", etc.
+              </Alert>
+              <Button
+                variant="contained"
+                size="large"
+                fullWidth
+                startIcon={<AutoAwesomeIcon />}
+                onClick={() => setWizardOpen(true)}
+                disabled={persons.length < 2}
+              >
+                Open Relationship Wizard
+              </Button>
+              {persons.length < 2 && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  You need at least 2 people in the family to create relationships.
+                </Typography>
+              )}
+            </Box>
+          ) : (
+            <>
+              {relationshipError && (
+                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setRelationshipError(null)}>
+                  {relationshipError}
+                </Alert>
+              )}
+              
+              {relationshipSuccess && (
+                <Alert severity="success" sx={{ mb: 2 }} onClose={() => setRelationshipSuccess(false)}>
+                  Relationship created successfully!
+                </Alert>
+              )}
 
-          <Stack spacing={2}>
+              <Stack spacing={2}>
             <FormControl fullWidth>
               <InputLabel id="from-person-label">From Person</InputLabel>
               <Select
@@ -394,9 +435,25 @@ const Topology = () => {
             >
               {submittingRelationship ? 'Adding...' : 'Add Relationship'}
             </Button>
-          </Stack>
+              </Stack>
+            </>
+          )}
         </CardContent>
       </Card>
+
+      {/* Relationship Wizard */}
+      <RelationshipWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        familyId={activeFamilyId}
+        persons={persons}
+        topology={topology}
+        viewerPersonId={viewerPersonId}
+        onSuccess={async () => {
+          // Refetch topology after successful relationship creation
+          await fetchTopologyData();
+        }}
+      />
 
       {/* Nodes Card */}
       <Card sx={{ mb: 3 }}>

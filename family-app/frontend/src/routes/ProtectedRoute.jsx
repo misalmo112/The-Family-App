@@ -10,6 +10,7 @@ const ProtectedRoute = ({ children }) => {
   const location = useLocation();
   const [hasFamilies, setHasFamilies] = useState(null);
   const [checking, setChecking] = useState(true);
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
 
   // Routes that don't require families check
   const onboardingRoutes = ['/onboarding', '/pending'];
@@ -28,6 +29,19 @@ const ProtectedRoute = ({ children }) => {
       if (onboardingRoutes.some(route => location.pathname.startsWith(route))) {
         setChecking(false);
         return;
+      }
+
+      // Check if user is superadmin - if so, skip family check
+      try {
+        const { getHealth } = await import('../services/admin');
+        await getHealth();
+        setIsSuperadmin(true);
+        setHasFamilies(true); // Set to true to bypass family requirement
+        setChecking(false);
+        return;
+      } catch (err) {
+        setIsSuperadmin(false);
+        // Not superadmin, continue with family check
       }
 
       try {
@@ -55,8 +69,14 @@ const ProtectedRoute = ({ children }) => {
   }
 
   // If user has no families and is not on onboarding routes, redirect to onboarding
-  if (hasFamilies === false && !onboardingRoutes.some(route => location.pathname.startsWith(route))) {
+  // But skip if user is superadmin
+  if (hasFamilies === false && !isSuperadmin && !onboardingRoutes.some(route => location.pathname.startsWith(route))) {
     return <Navigate to="/onboarding" replace />;
+  }
+  
+  // If user is superadmin and on a regular route, redirect to superadmin panel
+  if (isSuperadmin && !location.pathname.startsWith('/superadmin') && !onboardingRoutes.some(route => location.pathname.startsWith(route))) {
+    return <Navigate to="/superadmin" replace />;
   }
 
   // Check if current route requires active family
