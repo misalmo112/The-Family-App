@@ -77,9 +77,18 @@ const Families = () => {
         <Typography variant="h4" component="h1" gutterBottom>
           Families
         </Typography>
-        <Alert severity="info">
+        <Alert severity="info" sx={{ mb: 3 }}>
           You don't belong to any families yet. Create a family or join one to get started.
         </Alert>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="contained"
+            size="large"
+            onClick={() => navigate('/onboarding')}
+          >
+            Get Started
+          </Button>
+        </Box>
       </Box>
     );
   }

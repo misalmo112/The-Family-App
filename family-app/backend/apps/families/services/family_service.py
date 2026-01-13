@@ -3,15 +3,20 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from apps.families.models import Family, FamilyMembership, JoinRequest
+from apps.graph.models import GenderChoices
 
 
-def create_family_with_membership(name, creator):
+def create_family_with_membership(name, creator, first_name=None, last_name=None, dob=None, gender=None):
     """
     Create a family with an admin membership and Person node for the creator.
     
     Args:
         name: Family name
         creator: User instance who is creating the family
+        first_name: Optional first name for the person (defaults to username if not provided)
+        last_name: Optional last name for the person
+        dob: Optional date of birth for the person
+        gender: Optional gender for the person (defaults to UNKNOWN)
         
     Returns:
         Family instance
@@ -22,16 +27,23 @@ def create_family_with_membership(name, creator):
         # Create family (code will be auto-generated)
         family = Family.objects.create(name=name, created_by=creator)
         
-        # Derive first_name and last_name from username
-        username_parts = creator.username.split(' ', 1)
-        first_name = username_parts[0] if username_parts else creator.username
-        last_name = username_parts[1] if len(username_parts) > 1 else ''
+        # Use provided person data or derive from username
+        if first_name is None:
+            username_parts = creator.username.split(' ', 1)
+            first_name = username_parts[0] if username_parts else creator.username
+        if last_name is None:
+            username_parts = creator.username.split(' ', 1)
+            last_name = username_parts[1] if len(username_parts) > 1 else ''
+        if gender is None:
+            gender = GenderChoices.UNKNOWN
         
         # Create Person node for creator
         person = Person.objects.create(
             family=family,
             first_name=first_name,
-            last_name=last_name
+            last_name=last_name,
+            dob=dob,
+            gender=gender
         )
         
         # Create admin membership

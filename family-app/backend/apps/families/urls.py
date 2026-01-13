@@ -9,4 +9,5 @@ urlpatterns = [
     path('join-requests/', views.JoinRequestListView.as_view(), name='join-request-list'),
     path('join-requests/<int:pk>/approve/', views.JoinRequestApproveView.as_view(), name='join-request-approve'),
     path('join-requests/<int:pk>/reject/', views.JoinRequestRejectView.as_view(), name='join-request-reject'),
+    path('my-join-requests/', views.MyJoinRequestsView.as_view(), name='my-join-requests'),
 ]

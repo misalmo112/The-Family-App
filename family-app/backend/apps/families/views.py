@@ -42,7 +42,11 @@ class FamilyView(APIView):
             try:
                 family = create_family_with_membership(
                     name=serializer.validated_data['name'],
-                    creator=request.user
+                    creator=request.user,
+                    first_name=serializer.validated_data.get('first_name'),
+                    last_name=serializer.validated_data.get('last_name'),
+                    dob=serializer.validated_data.get('dob'),
+                    gender=serializer.validated_data.get('gender')
                 )
                 response_serializer = FamilySerializer(family)
                 return Response(response_serializer.data, status=status.HTTP_201_CREATED)
@@ -163,3 +167,17 @@ class JoinRequestRejectView(APIView):
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class MyJoinRequestsView(APIView):
+    """List join requests made by the current user"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """List all join requests made by the current user"""
+        join_requests = JoinRequest.objects.filter(
+            requested_by=request.user
+        ).select_related('family').order_by('-created_at')
+        
+        serializer = JoinRequestListSerializer(join_requests, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

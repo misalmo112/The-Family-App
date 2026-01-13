@@ -39,6 +39,12 @@ const AppShell = () => {
           <Button color="inherit" component={Link} to="/post">
             Post
           </Button>
+          <Button color="inherit" component={Link} to="/join">
+            Join Family
+          </Button>
+          <Button color="inherit" component={Link} to="/admin/join-requests">
+            Join Requests
+          </Button>
           <Button color="inherit" onClick={handleLogout}>
             Logout
           </Button>

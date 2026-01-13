@@ -6,10 +6,23 @@ class FamilySerializer(serializers.ModelSerializer):
     """Serializer for Family model"""
     code = serializers.CharField(read_only=True)
     created_by = serializers.StringRelatedField(read_only=True)
+    # Optional person profile fields for family creation
+    first_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    last_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    dob = serializers.DateField(write_only=True, required=False, allow_null=True)
+    gender = serializers.ChoiceField(
+        choices=['MALE', 'FEMALE', 'OTHER', 'UNKNOWN'],
+        write_only=True,
+        required=False,
+        allow_blank=True
+    )
     
     class Meta:
         model = Family
-        fields = ['id', 'name', 'code', 'created_by', 'created_at', 'updated_at']
+        fields = [
+            'id', 'name', 'code', 'created_by', 'created_at', 'updated_at',
+            'first_name', 'last_name', 'dob', 'gender'
+        ]
         read_only_fields = ['id', 'code', 'created_by', 'created_at', 'updated_at']
 
 

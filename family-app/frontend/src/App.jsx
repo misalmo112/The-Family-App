@@ -6,6 +6,9 @@ import Families from './pages/Families';
 import Feed from './pages/Feed';
 import Topology from './pages/Topology';
 import Post from './pages/Post';
+import { Onboarding, PendingApproval } from './pages/Onboarding';
+import AdminJoinRequests from './pages/AdminJoinRequests';
+import JoinFamily from './pages/JoinFamily';
 
 function App({ RouterComponent = BrowserRouter }) {
   return (
@@ -25,7 +28,25 @@ function App({ RouterComponent = BrowserRouter }) {
           <Route path="feed" element={<Feed />} />
           <Route path="topology" element={<Topology />} />
           <Route path="post" element={<Post />} />
+          <Route path="join" element={<JoinFamily />} />
+          <Route path="admin/join-requests" element={<AdminJoinRequests />} />
         </Route>
+        <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute>
+              <Onboarding />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pending"
+          element={
+            <ProtectedRoute>
+              <PendingApproval />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </RouterComponent>
   );
