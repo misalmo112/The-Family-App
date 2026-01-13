@@ -31,3 +31,22 @@ export const getTopology = async ({ familyId, viewerPersonId }) => {
   });
   return response.data;
 };
+
+/**
+ * Create a relationship between two persons
+ * @param {Object} params - Relationship parameters
+ * @param {number} params.familyId - The family ID
+ * @param {number} params.fromPersonId - The person ID for the "from" side
+ * @param {number} params.toPersonId - The person ID for the "to" side
+ * @param {string} params.type - Relationship type ('PARENT_OF' or 'SPOUSE_OF')
+ * @returns {Promise<Object>} Created relationship object(s)
+ */
+export const createRelationship = async ({ familyId, fromPersonId, toPersonId, type }) => {
+  const response = await api.post('/api/graph/relationships/', {
+    family_id: familyId,
+    from_person_id: fromPersonId,
+    to_person_id: toPersonId,
+    type: type,  // 'PARENT_OF' or 'SPOUSE_OF'
+  });
+  return response.data;
+};

@@ -1,4 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import {
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  CircularProgress,
+  Box,
+  Typography,
+} from '@mui/material';
 import { useFamily } from '../../context/FamilyContext';
 import { getFamilies } from '../../services/families';
 
@@ -51,9 +60,9 @@ const FamilySwitcher = () => {
 
   if (loading) {
     return (
-      <div style={{ padding: '0.5rem 1rem' }}>
-        <span style={{ color: '#666' }}>Loading...</span>
-      </div>
+      <Box sx={{ display: 'flex', alignItems: 'center', px: 1 }}>
+        <CircularProgress size={20} />
+      </Box>
     );
   }
 
@@ -62,52 +71,47 @@ const FamilySwitcher = () => {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-      <label 
-        htmlFor="family-switcher"
-        style={{ 
-          fontSize: '0.9rem', 
-          color: '#666',
-          whiteSpace: 'nowrap'
-        }}
-      >
-        Family:
-      </label>
-      <select
+    <FormControl
+      size="small"
+      sx={{
+        minWidth: 180,
+        '& .MuiOutlinedInput-root': {
+          backgroundColor: 'background.paper',
+        },
+      }}
+    >
+      <InputLabel id="family-switcher-label">Family</InputLabel>
+      <Select
+        labelId="family-switcher-label"
         id="family-switcher"
         value={activeFamilyId || ''}
+        label="Family"
         onChange={handleFamilyChange}
-        style={{
-          padding: '0.5rem',
-          borderRadius: '4px',
-          border: '1px solid #ddd',
-          backgroundColor: '#fff',
-          cursor: 'pointer',
-          fontSize: '0.9rem',
-          minWidth: '150px',
+        sx={{
+          color: 'inherit',
+          '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'rgba(255, 255, 255, 0.23)',
+          },
+          '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'rgba(255, 255, 255, 0.4)',
+          },
+          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'rgba(255, 255, 255, 0.4)',
+          },
         }}
       >
         {!activeFamilyId && (
-          <option value="">Select Family</option>
+          <MenuItem value="">
+            <em>Select Family</em>
+          </MenuItem>
         )}
         {families.map((family) => (
-          <option key={family.id} value={family.id}>
+          <MenuItem key={family.id} value={family.id}>
             {family.name}
-          </option>
+          </MenuItem>
         ))}
-      </select>
-      {activeFamilyName && (
-        <span 
-          style={{ 
-            fontSize: '0.85rem', 
-            color: '#666',
-            fontStyle: 'italic'
-          }}
-        >
-          ({activeFamilyName})
-        </span>
-      )}
-    </div>
+      </Select>
+    </FormControl>
   );
 };
 

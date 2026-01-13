@@ -1,7 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Container,
+  Typography,
+  Card,
+  CardContent,
+  CardHeader,
+  Avatar,
+  Chip,
+  Button,
+  Alert,
+  CircularProgress,
+  Stack,
+  Divider,
+} from '@mui/material';
+import {
+  Announcement as AnnouncementIcon,
+  Article as ArticleIcon,
+} from '@mui/icons-material';
 import { useFamily } from '../../context/FamilyContext';
 import { getFeed } from '../../services/feed';
+import { SkeletonPostList } from '../../components/Loading/SkeletonPost';
+import PageTransition from '../../components/PageTransition';
+
+/**
+ * Format date to relative time (e.g., "2 hours ago")
+ */
+const formatRelativeTime = (dateString) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now - date) / 1000);
+
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) {
+    const minutes = Math.floor(diffInSeconds / 60);
+    return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+  }
+  if (diffInSeconds < 86400) {
+    const hours = Math.floor(diffInSeconds / 3600);
+    return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+  }
+  if (diffInSeconds < 604800) {
+    const days = Math.floor(diffInSeconds / 86400);
+    return `${days} day${days !== 1 ? 's' : ''} ago`;
+  }
+  return date.toLocaleDateString();
+};
+
+/**
+ * Get initials from name
+ */
+const getInitials = (name) => {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+};
 
 /**
  * Feed Page
@@ -11,10 +68,12 @@ const Feed = () => {
   const { activeFamilyId, activeFamilyName } = useFamily();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
   const navigate = useNavigate();
+  const observerTarget = useRef(null);
 
   useEffect(() => {
     // Redirect to family selection if no active family
@@ -23,22 +82,36 @@ const Feed = () => {
       return;
     }
 
-    // Fetch posts when activeFamilyId changes
-    fetchPosts(activeFamilyId, page);
-  }, [activeFamilyId, page, navigate]);
+    // Reset posts and page when family changes
+    setPosts([]);
+    setPage(1);
+    fetchPosts(activeFamilyId, 1, true);
+  }, [activeFamilyId, navigate]);
 
   /**
    * Fetch posts from API
    * @param {number} familyId - The family ID
    * @param {number} pageNum - The page number
+   * @param {boolean} reset - Whether to reset posts or append
    */
-  const fetchPosts = async (familyId, pageNum) => {
+  const fetchPosts = async (familyId, pageNum, reset = false) => {
     try {
-      setLoading(true);
+      if (reset) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
       setError(null);
 
       const data = await getFeed({ familyId, page: pageNum });
-      setPosts(data.results || []);
+      const newPosts = data.results || [];
+      
+      if (reset) {
+        setPosts(newPosts);
+      } else {
+        setPosts((prevPosts) => [...prevPosts, ...newPosts]);
+      }
+      
       setPagination({
         count: data.count || data.results?.length || 0,
         page: data.page || pageNum,
@@ -62,14 +135,34 @@ const Feed = () => {
       }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= pagination.totalPages) {
-      setPage(newPage);
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && pagination?.hasNext && !loadingMore && !loading) {
+          const nextPage = page + 1;
+          setPage(nextPage);
+          fetchPosts(activeFamilyId, nextPage, false);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
     }
-  };
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [pagination, loadingMore, loading, page, activeFamilyId]);
 
   if (!activeFamilyId) {
     return null; // Will redirect via useEffect
@@ -77,165 +170,138 @@ const Feed = () => {
 
   if (loading && posts.length === 0) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <p>Loading posts...</p>
-      </div>
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <SkeletonPostList count={3} />
+      </Container>
     );
   }
 
   if (error) {
     return (
-      <div style={{ padding: '2rem' }}>
-        <div
-          style={{
-            padding: '1rem',
-            backgroundColor: '#fee',
-            border: '1px solid #fcc',
-            borderRadius: '4px',
-            marginBottom: '1rem',
-          }}
-        >
-          <p style={{ color: '#c00', margin: 0 }}>{error}</p>
-        </div>
-        <button
-          onClick={() => fetchPosts(activeFamilyId, page)}
-          style={{
-            padding: '0.5rem 1rem',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
-          Retry
-        </button>
-      </div>
+      <Container maxWidth="md">
+        <Box sx={{ py: 4 }}>
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+          <Button variant="contained" onClick={() => fetchPosts(activeFamilyId, page)}>
+            Retry
+          </Button>
+        </Box>
+      </Container>
     );
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-      <h1 style={{ marginBottom: '1rem' }}>
-        {activeFamilyName ? `${activeFamilyName} Feed` : 'Feed'}
-      </h1>
+    <PageTransition>
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 3 }}>
+          {activeFamilyName ? `${activeFamilyName} Feed` : 'Feed'}
+        </Typography>
 
       {posts.length === 0 ? (
-        <div style={{ padding: '2rem', textAlign: 'center' }}>
-          <p>No posts yet. Be the first to post!</p>
-        </div>
+        <Card>
+          <CardContent>
+            <Box textAlign="center" py={4}>
+              <ArticleIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                No posts yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Be the first to share something with your family!
+              </Typography>
+              <Button
+                variant="contained"
+                onClick={() => navigate('/post')}
+                startIcon={<ArticleIcon />}
+              >
+                Create Post
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
       ) : (
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {posts.map((post) => (
-              <div
-                key={post.id}
-                style={{
-                  padding: '1.5rem',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  backgroundColor: '#fff',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '0.5rem',
-                  }}
-                >
-                  <div>
-                    <strong>{post.author_user}</strong>
-                    {post.author_person_name && (
-                      <span style={{ color: '#666', marginLeft: '0.5rem' }}>
-                        ({post.author_person_name})
-                      </span>
-                    )}
-                  </div>
-                  <span
-                    style={{
-                      fontSize: '0.85rem',
-                      color: '#666',
-                      padding: '0.25rem 0.5rem',
-                      backgroundColor: post.type === 'ANNOUNCEMENT' ? '#fff3cd' : '#e7f3ff',
-                      borderRadius: '4px',
-                    }}
-                  >
-                    {post.type}
-                  </span>
-                </div>
-                <p style={{ margin: '0.5rem 0', whiteSpace: 'pre-wrap' }}>{post.text}</p>
-                {post.image_url && (
-                  <img
-                    src={post.image_url}
-                    alt="Post"
-                    style={{
-                      maxWidth: '100%',
-                      borderRadius: '4px',
-                      marginTop: '0.5rem',
-                    }}
-                  />
-                )}
-                <div
-                  style={{
-                    fontSize: '0.85rem',
-                    color: '#666',
-                    marginTop: '0.5rem',
-                  }}
-                >
-                  {new Date(post.created_at).toLocaleString()}
-                </div>
-              </div>
-            ))}
-          </div>
+          <Stack spacing={3}>
+            {posts.map((post) => {
+              const authorName = post.author_person_name || post.author_user;
+              const initials = getInitials(authorName);
+              const isAnnouncement = post.type === 'ANNOUNCEMENT';
 
-          {pagination && pagination.totalPages > 1 && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: '1rem',
-                marginTop: '2rem',
-              }}
-            >
-              <button
-                onClick={() => handlePageChange(page - 1)}
-                disabled={!pagination.hasPrevious}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: pagination.hasPrevious ? '#007bff' : '#ccc',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: pagination.hasPrevious ? 'pointer' : 'not-allowed',
-                }}
-              >
-                Previous
-              </button>
-              <span>
-                Page {pagination.page} of {pagination.totalPages}
-              </span>
-              <button
-                onClick={() => handlePageChange(page + 1)}
-                disabled={!pagination.hasNext}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: pagination.hasNext ? '#007bff' : '#ccc',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: pagination.hasNext ? 'pointer' : 'not-allowed',
-                }}
-              >
-                Next
-              </button>
-            </div>
+              return (
+                <Card key={post.id} sx={{ transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}>
+                  <CardHeader
+                    avatar={
+                      <Avatar sx={{ bgcolor: isAnnouncement ? 'warning.main' : 'primary.main' }}>
+                        {initials}
+                      </Avatar>
+                    }
+                    title={
+                      <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                        <Typography variant="subtitle1" component="span">
+                          {post.author_user}
+                        </Typography>
+                        {post.author_person_name && (
+                          <Typography variant="body2" color="text.secondary" component="span">
+                            ({post.author_person_name})
+                          </Typography>
+                        )}
+                        <Chip
+                          icon={isAnnouncement ? <AnnouncementIcon /> : <ArticleIcon />}
+                          label={post.type}
+                          size="small"
+                          color={isAnnouncement ? 'warning' : 'primary'}
+                          variant={isAnnouncement ? 'filled' : 'outlined'}
+                        />
+                      </Box>
+                    }
+                    subheader={formatRelativeTime(post.created_at)}
+                  />
+                  <Divider />
+                  <CardContent>
+                    <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mb: post.image_url ? 2 : 0 }}>
+                      {post.text}
+                    </Typography>
+                    {post.image_url && (
+                      <Box
+                        component="img"
+                        src={post.image_url}
+                        alt="Post"
+                        sx={{
+                          width: '100%',
+                          maxHeight: '400px',
+                          objectFit: 'contain',
+                          borderRadius: 2,
+                          mt: 2,
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => window.open(post.image_url, '_blank')}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </Stack>
+
+          {/* Infinite scroll trigger */}
+          {pagination?.hasNext && (
+            <Box ref={observerTarget} sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+              {loadingMore && <CircularProgress />}
+            </Box>
+          )}
+          
+          {/* End of feed message */}
+          {!pagination?.hasNext && posts.length > 0 && (
+            <Box textAlign="center" py={4}>
+              <Typography variant="body2" color="text.secondary">
+                You've reached the end of the feed
+              </Typography>
+            </Box>
           )}
         </>
       )}
-    </div>
+      </Container>
+    </PageTransition>
   );
 };
 

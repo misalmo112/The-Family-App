@@ -130,7 +130,7 @@ const Families = () => {
                   </Typography>
                 )}
               </Typography>
-              <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 2 }, mt: 1 }}>
                 <Typography variant="body2" color="text.secondary">
                   Code: <strong>{family.code}</strong>
                 </Typography>

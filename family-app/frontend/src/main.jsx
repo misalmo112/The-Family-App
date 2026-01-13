@@ -1,18 +1,24 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { CssBaseline } from '@mui/material';
+import { ThemeProvider, CssBaseline } from '@mui/material';
 import { AuthProvider } from './context/AuthContext';
 import { FamilyProvider } from './context/FamilyContext';
+import ErrorBoundary from './components/ErrorBoundary';
+import { lightTheme } from './theme';
 import './index.css';
 import App from './App.jsx';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <CssBaseline />
-    <AuthProvider>
-      <FamilyProvider>
-        <App />
-      </FamilyProvider>
-    </AuthProvider>
+    <ThemeProvider theme={lightTheme}>
+      <CssBaseline />
+      <ErrorBoundary>
+        <AuthProvider>
+          <FamilyProvider>
+            <App />
+          </FamilyProvider>
+        </AuthProvider>
+      </ErrorBoundary>
+    </ThemeProvider>
   </StrictMode>,
 );

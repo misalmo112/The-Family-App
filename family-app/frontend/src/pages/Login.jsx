@@ -52,7 +52,7 @@ const Login = () => {
           minHeight: '100vh',
         }}
       >
-        <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
+        <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, width: '100%' }}>
           <Typography variant="h4" component="h1" gutterBottom align="center">
             Login
           </Typography>

@@ -1,7 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Container,
+  Paper,
+  Typography,
+  Box,
+  TextField,
+  MenuItem,
+  Button,
+  Alert,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  Stack,
+} from '@mui/material';
+import {
+  Article as ArticleIcon,
+  Announcement as AnnouncementIcon,
+  Image as ImageIcon,
+} from '@mui/icons-material';
 import { useFamily } from '../../context/FamilyContext';
 import { createPost } from '../../services/feed';
+import PageTransition from '../../components/PageTransition';
 
 /**
  * CreatePost Page
@@ -14,6 +35,7 @@ const CreatePost = () => {
   const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [textError, setTextError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,6 +46,23 @@ const CreatePost = () => {
     }
   }, [activeFamilyId, navigate]);
 
+  const validateText = (value) => {
+    if (!value.trim()) {
+      setTextError('Text is required.');
+      return false;
+    }
+    setTextError('');
+    return true;
+  };
+
+  const handleTextChange = (e) => {
+    const value = e.target.value;
+    setText(value);
+    if (textError) {
+      validateText(value);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -32,8 +71,7 @@ const CreatePost = () => {
       return;
     }
 
-    if (!text.trim()) {
-      setError('Text is required.');
+    if (!validateText(text)) {
       return;
     }
 
@@ -87,148 +125,98 @@ const CreatePost = () => {
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
-      <h1 style={{ marginBottom: '1.5rem' }}>Create Post</h1>
+    <PageTransition>
+      <Container maxWidth="sm" sx={{ py: 4 }}>
+        <Paper elevation={3} sx={{ p: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 3 }}>
+          Create Post
+        </Typography>
 
-      {error && (
-        <div
-          style={{
-            padding: '1rem',
-            backgroundColor: '#fee',
-            border: '1px solid #fcc',
-            borderRadius: '4px',
-            marginBottom: '1rem',
-          }}
-        >
-          <p style={{ color: '#c00', margin: 0 }}>{error}</p>
-        </div>
-      )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label
-            htmlFor="type"
-            style={{
-              display: 'block',
-              marginBottom: '0.5rem',
-              fontWeight: 'bold',
-            }}
-          >
-            Type <span style={{ color: '#c00' }}>*</span>
-          </label>
-          <select
-            id="type"
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            disabled={loading}
-            required
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              borderRadius: '4px',
-              border: '1px solid #ddd',
-              fontSize: '1rem',
-            }}
-          >
-            <option value="POST">POST</option>
-            <option value="ANNOUNCEMENT">ANNOUNCEMENT</option>
-          </select>
-        </div>
+        <Box component="form" onSubmit={handleSubmit}>
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <InputLabel id="post-type-label">Post Type</InputLabel>
+            <Select
+              labelId="post-type-label"
+              id="post-type"
+              value={type}
+              label="Post Type"
+              onChange={(e) => setType(e.target.value)}
+              disabled={loading}
+              required
+            >
+              <MenuItem value="POST">
+                <Box display="flex" alignItems="center" gap={1}>
+                  <ArticleIcon fontSize="small" />
+                  <span>Post</span>
+                </Box>
+              </MenuItem>
+              <MenuItem value="ANNOUNCEMENT">
+                <Box display="flex" alignItems="center" gap={1}>
+                  <AnnouncementIcon fontSize="small" />
+                  <span>Announcement</span>
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
 
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label
-            htmlFor="text"
-            style={{
-              display: 'block',
-              marginBottom: '0.5rem',
-              fontWeight: 'bold',
-            }}
-          >
-            Text <span style={{ color: '#c00' }}>*</span>
-          </label>
-          <textarea
-            id="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            disabled={loading}
-            required
+          <TextField
+            fullWidth
+            label="Post Text"
+            multiline
             rows={6}
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              borderRadius: '4px',
-              border: '1px solid #ddd',
-              fontSize: '1rem',
-              fontFamily: 'inherit',
-              resize: 'vertical',
-            }}
+            value={text}
+            onChange={handleTextChange}
+            onBlur={() => validateText(text)}
+            error={!!textError}
+            helperText={textError || 'Share what\'s on your mind with your family'}
+            required
+            disabled={loading}
+            sx={{ mb: 3 }}
+            inputProps={{ maxLength: 5000 }}
           />
-        </div>
 
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label
-            htmlFor="imageUrl"
-            style={{
-              display: 'block',
-              marginBottom: '0.5rem',
-              fontWeight: 'bold',
-            }}
-          >
-            Image URL (optional)
-          </label>
-          <input
+          <TextField
+            fullWidth
+            label="Image URL"
             type="url"
-            id="imageUrl"
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
-            disabled={loading}
             placeholder="https://example.com/image.jpg"
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              borderRadius: '4px',
-              border: '1px solid #ddd',
-              fontSize: '1rem',
+            helperText="Optional: Add an image to your post"
+            disabled={loading}
+            sx={{ mb: 3 }}
+            InputProps={{
+              startAdornment: <ImageIcon sx={{ mr: 1, color: 'text.secondary' }} />,
             }}
           />
-        </div>
 
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              padding: '0.75rem 1.5rem',
-              backgroundColor: loading ? '#ccc' : '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: '1rem',
-              fontWeight: 'bold',
-            }}
-          >
-            {loading ? 'Creating...' : 'Create Post'}
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/feed')}
-            disabled={loading}
-            style={{
-              padding: '0.75rem 1.5rem',
-              backgroundColor: '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: '1rem',
-            }}
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
+          <Stack direction="row" spacing={2} justifyContent="flex-end">
+            <Button
+              variant="outlined"
+              onClick={() => navigate('/feed')}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={loading || !text.trim()}
+              startIcon={loading ? <CircularProgress size={20} /> : <ArticleIcon />}
+            >
+              {loading ? 'Creating...' : 'Create Post'}
+            </Button>
+          </Stack>
+        </Box>
+      </Paper>
+      </Container>
+    </PageTransition>
   );
 };
 
