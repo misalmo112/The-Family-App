@@ -6,7 +6,6 @@ import {
   Typography,
   Box,
   TextField,
-  MenuItem,
   Button,
   Alert,
   CircularProgress,
@@ -22,10 +21,6 @@ const JoinFamily = () => {
   const navigate = useNavigate();
   const [familyCode, setFamilyCode] = useState('');
   const [mode, setMode] = useState('create'); // 'create' or 'listed'
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [dob, setDob] = useState('');
-  const [gender, setGender] = useState('');
   const [chosenPersonId, setChosenPersonId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -65,23 +60,8 @@ const JoinFamily = () => {
           setLoading(false);
           return;
         }
-      } else {
-        // Create me mode
-        const newPersonPayload = {};
-        if (firstName.trim()) newPersonPayload.first_name = firstName.trim();
-        if (lastName.trim()) newPersonPayload.last_name = lastName.trim();
-        if (dob) newPersonPayload.dob = dob;
-        if (gender) newPersonPayload.gender = gender;
-        
-        // At least one field should be provided
-        if (Object.keys(newPersonPayload).length === 0) {
-          setError('Please provide at least one person detail (first name, last name, date of birth, or gender)');
-          setLoading(false);
-          return;
-        }
-        
-        payload.new_person_payload = newPersonPayload;
       }
+      // For 'create' mode, backend will use user profile data automatically
 
       await submitJoinRequest(payload);
       setSuccess(true);
@@ -187,54 +167,21 @@ const JoinFamily = () => {
 
             {mode === 'create' && (
               <Box sx={{ mb: 3 }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Provide your information (all fields are optional):
-                </Typography>
-                <TextField
-                  fullWidth
-                  label="First Name"
-                  variant="outlined"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  sx={{ mb: 2 }}
-                  disabled={loading || success}
-                />
-                <TextField
-                  fullWidth
-                  label="Last Name"
-                  variant="outlined"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  sx={{ mb: 2 }}
-                  disabled={loading || success}
-                />
-                <TextField
-                  fullWidth
-                  label="Date of Birth"
-                  type="date"
-                  variant="outlined"
-                  value={dob}
-                  onChange={(e) => setDob(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ mb: 2 }}
-                  disabled={loading || success}
-                />
-                <TextField
-                  fullWidth
-                  select
-                  label="Gender"
-                  variant="outlined"
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                  sx={{ mb: 2 }}
-                  disabled={loading || success}
-                >
-                  <MenuItem value="">Not specified</MenuItem>
-                  <MenuItem value="MALE">Male</MenuItem>
-                  <MenuItem value="FEMALE">Female</MenuItem>
-                  <MenuItem value="OTHER">Other</MenuItem>
-                  <MenuItem value="UNKNOWN">Prefer not to say</MenuItem>
-                </TextField>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Your profile information will be used to create your person in the family. You can update your details in your{' '}
+                  <Button
+                    component="a"
+                    href="/profile"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate('/profile');
+                    }}
+                    sx={{ textTransform: 'none', p: 0, minWidth: 'auto', verticalAlign: 'baseline' }}
+                  >
+                    profile settings
+                  </Button>
+                  .
+                </Alert>
               </Box>
             )}
 

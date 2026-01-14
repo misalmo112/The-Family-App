@@ -200,11 +200,83 @@ curl -X POST http://127.0.0.1:8000/api/auth/token/refresh/ \
   -d '{"refresh": "your_refresh_token"}'
 ```
 
+### User Registration
+
+Register a new user account:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/register/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "johndoe",
+    "email": "john@example.com",
+    "password": "securepass123",
+    "password_confirm": "securepass123",
+    "first_name": "John",
+    "last_name": "Doe",
+    "dob": "1990-01-15",
+    "gender": "MALE"
+  }'
+```
+
+Expected response:
+```json
+{
+  "user": {
+    "id": 1,
+    "username": "johndoe",
+    "email": "john@example.com",
+    "first_name": "John",
+    "last_name": "Doe",
+    "dob": "1990-01-15",
+    "gender": "MALE",
+    "date_joined": "2024-01-01T12:00:00Z"
+  },
+  "tokens": {
+    "access": "...",
+    "refresh": "..."
+  }
+}
+```
+
+**Note:** Registration automatically returns JWT tokens, so you can immediately use the access token for authenticated requests.
+
+### User Profile Management
+
+**Get Profile:**
+```bash
+curl -X GET http://127.0.0.1:8000/api/auth/me/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+**Update Profile:**
+```bash
+curl -X PATCH http://127.0.0.1:8000/api/auth/me/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "first_name": "Jane",
+    "dob": "1992-05-20"
+  }'
+```
+
+**Change Password:**
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/change-password/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "old_password": "oldpass123",
+    "new_password": "newpass456",
+    "new_password_confirm": "newpass456"
+  }'
+```
+
 ## Phase 1 API Usage
 
 ### Creating a Family
 
-Create a new family (you will automatically become the admin):
+Create a new family (you will automatically become the admin). Your user profile information (first_name, last_name, dob, gender) will be used to create your Person node in the family:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/families/ \
@@ -212,6 +284,8 @@ curl -X POST http://127.0.0.1:8000/api/families/ \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -d '{"name": "The Smith Family"}'
 ```
+
+**Note:** The Person node for the family creator is automatically created using the user's profile data. Make sure your profile is up to date in `/api/auth/me/`.
 
 Expected response:
 ```json
@@ -252,7 +326,8 @@ Expected response:
 
 Submit a request to join a family using the family code. You can either:
 - Use an existing person: provide `chosen_person_id`
-- Create a new person: provide `new_person_payload`
+- Create a new person: provide `new_person_payload` (optional - if omitted, your user profile data will be used)
+- Omit both: your user profile data will be used automatically
 
 **Option 1: Join with existing person**
 ```bash
@@ -265,7 +340,7 @@ curl -X POST http://127.0.0.1:8000/api/families/join/ \
   }'
 ```
 
-**Option 2: Join with new person**
+**Option 2: Join with new person (custom data)**
 ```bash
 curl -X POST http://127.0.0.1:8000/api/families/join/ \
   -H "Content-Type: application/json" \
@@ -280,6 +355,18 @@ curl -X POST http://127.0.0.1:8000/api/families/join/ \
     }
   }'
 ```
+
+**Option 3: Join using profile data (no payload)**
+```bash
+curl -X POST http://127.0.0.1:8000/api/families/join/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "code": "A1B2C3D4"
+  }'
+```
+
+**Note:** If `new_person_payload` is not provided, your user profile data (first_name, last_name, dob, gender) will be used when the join request is approved.
 
 Expected response:
 ```json
@@ -469,6 +556,10 @@ See `CODE_STRUCTURE.md` for detailed documentation about the project structure, 
 - `GET /health/` - Health check endpoint
 - `POST /api/auth/token/` - Obtain JWT access and refresh tokens
 - `POST /api/auth/token/refresh/` - Refresh access token
+- `POST /api/auth/register/` - User registration
+- `GET /api/auth/me/` - Get current user profile
+- `PATCH /api/auth/me/` - Update user profile
+- `POST /api/auth/change-password/` - Change password
 - `GET /admin/` - Django admin panel
 
 ### Phase 1 (Families & Graph)

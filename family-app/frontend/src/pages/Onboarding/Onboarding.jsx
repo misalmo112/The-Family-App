@@ -13,11 +13,9 @@ import {
   Step,
   StepLabel,
   TextField,
-  MenuItem,
   Alert,
   CircularProgress,
   IconButton,
-  InputAdornment,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -36,17 +34,9 @@ const Onboarding = () => {
   
   // Create family state
   const [familyName, setFamilyName] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [dob, setDob] = useState('');
-  const [gender, setGender] = useState('');
   
   // Join family state
   const [familyCode, setFamilyCode] = useState('');
-  const [joinFirstName, setJoinFirstName] = useState('');
-  const [joinLastName, setJoinLastName] = useState('');
-  const [joinDob, setJoinDob] = useState('');
-  const [joinGender, setJoinGender] = useState('');
   
   // Success state
   const [createdFamily, setCreatedFamily] = useState(null);
@@ -74,11 +64,9 @@ const Onboarding = () => {
           setError('Please enter a family name');
           return;
         }
-      } else if (activeStep === 1) {
-        if (!firstName.trim() && !lastName.trim()) {
-          setError('Please enter at least a first name or last name');
-          return;
-        }
+        // Submit on step 0 (family name)
+        handleSubmit();
+        return;
       }
     } else if (mode === 'join') {
       if (activeStep === 0) {
@@ -86,20 +74,14 @@ const Onboarding = () => {
           setError('Please enter a valid 8-character family code');
           return;
         }
-      } else if (activeStep === 1) {
-        if (!joinFirstName.trim() && !joinLastName.trim()) {
-          setError('Please enter at least a first name or last name');
-          return;
-        }
+        // Submit on step 0 (family code)
+        handleSubmit();
+        return;
       }
     }
     
-    if (activeStep === 1) {
-      handleSubmit();
-    } else {
-      setActiveStep(activeStep + 1);
-      setError(null);
-    }
+    setActiveStep(activeStep + 1);
+    setError(null);
   };
 
   const handleSubmit = async () => {
@@ -108,29 +90,16 @@ const Onboarding = () => {
 
     try {
       if (mode === 'create') {
-        const personData = {};
-        if (firstName.trim()) personData.first_name = firstName.trim();
-        if (lastName.trim()) personData.last_name = lastName.trim();
-        if (dob) personData.dob = dob;
-        if (gender) personData.gender = gender;
-
-        const family = await createFamily(familyName.trim(), personData);
+        const family = await createFamily(familyName.trim());
         setCreatedFamily(family);
         setActiveFamily(family.id, family.name);
-        setActiveStep(2);
+        setActiveStep(1);
       } else if (mode === 'join') {
-        const personPayload = {};
-        if (joinFirstName.trim()) personPayload.first_name = joinFirstName.trim();
-        if (joinLastName.trim()) personPayload.last_name = joinLastName.trim();
-        if (joinDob) personPayload.dob = joinDob;
-        if (joinGender) personPayload.gender = joinGender;
-
         const request = await submitJoinRequest({
-          code: familyCode.toUpperCase().trim(),
-          new_person_payload: personPayload
+          code: familyCode.toUpperCase().trim()
         });
         setJoinRequest(request);
-        setActiveStep(2);
+        setActiveStep(1);
       }
     } catch (err) {
       console.error('Error:', err);
@@ -258,8 +227,8 @@ const Onboarding = () => {
   }
 
   // Wizard steps
-  const createSteps = ['Family Name', 'Your Profile', 'Success'];
-  const joinSteps = ['Family Code', 'Your Profile', 'Request Submitted'];
+  const createSteps = ['Family Name', 'Success'];
+  const joinSteps = ['Family Code', 'Request Submitted'];
 
   const steps = mode === 'create' ? createSteps : joinSteps;
 
@@ -327,58 +296,8 @@ const Onboarding = () => {
               </Box>
             )}
 
-            {/* Create Family - Step 2: Profile */}
-            {mode === 'create' && activeStep === 1 && (
-              <Box>
-                <TextField
-                  fullWidth
-                  label="First Name"
-                  variant="outlined"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  label="Last Name"
-                  variant="outlined"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  label="Date of Birth"
-                  type="date"
-                  variant="outlined"
-                  value={dob}
-                  onChange={(e) => setDob(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  select
-                  label="Gender"
-                  variant="outlined"
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                  sx={{ mb: 2 }}
-                >
-                  <MenuItem value="">Not specified</MenuItem>
-                  <MenuItem value="MALE">Male</MenuItem>
-                  <MenuItem value="FEMALE">Female</MenuItem>
-                  <MenuItem value="OTHER">Other</MenuItem>
-                  <MenuItem value="UNKNOWN">Prefer not to say</MenuItem>
-                </TextField>
-                <Typography variant="body2" color="text.secondary">
-                  This information will be used to create your profile in the family.
-                </Typography>
-              </Box>
-            )}
-
-            {/* Create Family - Step 3: Success */}
-            {mode === 'create' && activeStep === 2 && createdFamily && (
+            {/* Create Family - Step 2: Success */}
+            {mode === 'create' && activeStep === 1 && createdFamily && (
               <Box sx={{ textAlign: 'center' }}>
                 <Alert severity="success" sx={{ mb: 3 }}>
                   Family created successfully!
@@ -402,8 +321,23 @@ const Onboarding = () => {
                     <ContentCopyIcon />
                   </IconButton>
                 </Box>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   Share this code with family members so they can join your family.
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  Your profile information will be used. You can update your details in your{' '}
+                  <Button
+                    component="a"
+                    href="/profile"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate('/profile');
+                    }}
+                    sx={{ textTransform: 'none', p: 0, minWidth: 'auto', verticalAlign: 'baseline' }}
+                  >
+                    profile settings
+                  </Button>
+                  .
                 </Typography>
                 <Button
                   variant="contained"
@@ -434,58 +368,8 @@ const Onboarding = () => {
               </Box>
             )}
 
-            {/* Join Family - Step 2: Profile */}
-            {mode === 'join' && activeStep === 1 && (
-              <Box>
-                <TextField
-                  fullWidth
-                  label="First Name"
-                  variant="outlined"
-                  value={joinFirstName}
-                  onChange={(e) => setJoinFirstName(e.target.value)}
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  label="Last Name"
-                  variant="outlined"
-                  value={joinLastName}
-                  onChange={(e) => setJoinLastName(e.target.value)}
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  label="Date of Birth"
-                  type="date"
-                  variant="outlined"
-                  value={joinDob}
-                  onChange={(e) => setJoinDob(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  select
-                  label="Gender"
-                  variant="outlined"
-                  value={joinGender}
-                  onChange={(e) => setJoinGender(e.target.value)}
-                  sx={{ mb: 2 }}
-                >
-                  <MenuItem value="">Not specified</MenuItem>
-                  <MenuItem value="MALE">Male</MenuItem>
-                  <MenuItem value="FEMALE">Female</MenuItem>
-                  <MenuItem value="OTHER">Other</MenuItem>
-                  <MenuItem value="UNKNOWN">Prefer not to say</MenuItem>
-                </TextField>
-                <Typography variant="body2" color="text.secondary">
-                  This information will be used to create your profile in the family.
-                </Typography>
-              </Box>
-            )}
-
-            {/* Join Family - Step 3: Pending */}
-            {mode === 'join' && activeStep === 2 && joinRequest && (
+            {/* Join Family - Step 2: Pending */}
+            {mode === 'join' && activeStep === 1 && joinRequest && (
               <Box sx={{ textAlign: 'center' }}>
                 <Alert severity="info" sx={{ mb: 3 }}>
                   Join request submitted!
@@ -496,8 +380,23 @@ const Onboarding = () => {
                 <Typography variant="body1" sx={{ mb: 2 }}>
                   Your request to join <strong>{joinRequest.family}</strong> has been submitted.
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   A family admin will review your request. You'll be notified once it's approved.
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  Your profile information will be used. You can update your details in your{' '}
+                  <Button
+                    component="a"
+                    href="/profile"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate('/profile');
+                    }}
+                    sx={{ textTransform: 'none', p: 0, minWidth: 'auto', verticalAlign: 'baseline' }}
+                  >
+                    profile settings
+                  </Button>
+                  .
                 </Typography>
                 <Button
                   variant="contained"
@@ -521,10 +420,10 @@ const Onboarding = () => {
           </Box>
 
           {/* Navigation buttons */}
-          {activeStep < 2 && (
+          {activeStep < 1 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
               <Button onClick={handleBack} disabled={loading}>
-                {activeStep === 0 ? 'Back' : 'Previous'}
+                Back
               </Button>
               <Button
                 variant="contained"
@@ -536,10 +435,8 @@ const Onboarding = () => {
                     <CircularProgress size={20} sx={{ mr: 1 }} />
                     Processing...
                   </>
-                ) : activeStep === 1 ? (
-                  'Submit'
                 ) : (
-                  'Next'
+                  'Submit'
                 )}
               </Button>
             </Box>

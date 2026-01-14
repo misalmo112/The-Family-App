@@ -46,6 +46,7 @@ const navigationItems = [
   { path: '/post', label: 'Create Post', icon: <AddCircleIcon /> },
   { path: '/join', label: 'Join Family', icon: <GroupAddIcon /> },
   { path: '/admin/join-requests', label: 'Join Requests', icon: <AdminPanelSettingsIcon /> },
+  { path: '/profile', label: 'Profile', icon: <PersonIcon /> },
   { path: '/superadmin', label: 'Superadmin', icon: <SecurityIcon /> },
 ];
 
@@ -185,6 +186,17 @@ const AppShell = () => {
               transformOrigin={{ horizontal: 'right', vertical: 'top' }}
               anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
+              <MenuItem
+                onClick={() => {
+                  navigate('/profile');
+                  handleUserMenuClose();
+                }}
+              >
+                <ListItemIcon>
+                  <PersonIcon fontSize="small" />
+                </ListItemIcon>
+                Profile
+              </MenuItem>
               <MenuItem onClick={handleLogout}>
                 <ListItemIcon>
                   <LogoutIcon fontSize="small" />

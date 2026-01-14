@@ -42,11 +42,7 @@ class FamilyView(APIView):
             try:
                 family = create_family_with_membership(
                     name=serializer.validated_data['name'],
-                    creator=request.user,
-                    first_name=serializer.validated_data.get('first_name'),
-                    last_name=serializer.validated_data.get('last_name'),
-                    dob=serializer.validated_data.get('dob'),
-                    gender=serializer.validated_data.get('gender')
+                    creator=request.user
                 )
                 response_serializer = FamilySerializer(family)
                 return Response(response_serializer.data, status=status.HTTP_201_CREATED)

@@ -6,17 +6,14 @@ from apps.families.models import Family, FamilyMembership, JoinRequest
 from apps.graph.models import GenderChoices
 
 
-def create_family_with_membership(name, creator, first_name=None, last_name=None, dob=None, gender=None):
+def create_family_with_membership(name, creator):
     """
     Create a family with an admin membership and Person node for the creator.
+    Uses the creator's profile data (first_name, last_name, dob, gender) from the User model.
     
     Args:
         name: Family name
         creator: User instance who is creating the family
-        first_name: Optional first name for the person (defaults to username if not provided)
-        last_name: Optional last name for the person
-        dob: Optional date of birth for the person
-        gender: Optional gender for the person (defaults to UNKNOWN)
         
     Returns:
         Family instance
@@ -27,15 +24,18 @@ def create_family_with_membership(name, creator, first_name=None, last_name=None
         # Create family (code will be auto-generated)
         family = Family.objects.create(name=name, created_by=creator)
         
-        # Use provided person data or derive from username
-        if first_name is None:
+        # Use User profile values, with fallback to username parsing if profile fields are empty
+        first_name = creator.first_name or ''
+        last_name = creator.last_name or ''
+        dob = creator.dob
+        gender = creator.gender if creator.gender else GenderChoices.UNKNOWN
+        
+        # Fallback to username parsing if first_name is empty
+        if not first_name:
             username_parts = creator.username.split(' ', 1)
             first_name = username_parts[0] if username_parts else creator.username
-        if last_name is None:
-            username_parts = creator.username.split(' ', 1)
-            last_name = username_parts[1] if len(username_parts) > 1 else ''
-        if gender is None:
-            gender = GenderChoices.UNKNOWN
+            if len(username_parts) > 1:
+                last_name = username_parts[1]
         
         # Create Person node for creator
         person = Person.objects.create(
@@ -84,12 +84,12 @@ def create_join_request(family_code, user, chosen_person_id=None, new_person_pay
     if FamilyMembership.objects.filter(user=user, family=family).exists():
         raise ValidationError("User is already a member of this family.")
     
-    # Validate either chosen_person_id OR new_person_payload provided
-    if not chosen_person_id and not new_person_payload:
-        raise ValidationError("Either chosen_person_id or new_person_payload must be provided.")
-    
+    # Validate not both chosen_person_id and new_person_payload provided
     if chosen_person_id and new_person_payload:
         raise ValidationError("Cannot provide both chosen_person_id and new_person_payload.")
+    
+    # Note: new_person_payload is optional - if None or empty, User profile values will be used during approval
+    # If neither chosen_person_id nor new_person_payload is provided, backend will use user profile data
     
     # Validate chosen_person exists if provided and belongs to the family
     chosen_person = None
@@ -156,18 +156,31 @@ def approve_join_request(join_request_id, reviewer):
             if join_request.chosen_person.family_id != join_request.family_id:
                 raise ValidationError("Chosen person does not belong to this family.")
             person = join_request.chosen_person
-        elif join_request.new_person_payload:
-            # Create new Person from payload
-            payload = join_request.new_person_payload
+        else:
+            # Create new Person from payload or User profile defaults
+            user = join_request.requested_by
+            payload = join_request.new_person_payload or {}
+            
+            # Use payload values if provided, otherwise default to User profile values
+            first_name = payload.get('first_name') if payload.get('first_name') else (user.first_name or '')
+            last_name = payload.get('last_name') if payload.get('last_name') else (user.last_name or '')
+            dob = payload.get('dob') if payload.get('dob') else user.dob
+            gender = payload.get('gender') if payload.get('gender') else (user.gender if user.gender else GenderChoices.UNKNOWN)
+            
+            # Fallback to username parsing if first_name is still empty
+            if not first_name:
+                username_parts = user.username.split(' ', 1)
+                first_name = username_parts[0] if username_parts else user.username
+                if len(username_parts) > 1 and not last_name:
+                    last_name = username_parts[1]
+            
             person = Person.objects.create(
                 family=join_request.family,
-                first_name=payload.get('first_name', ''),
-                last_name=payload.get('last_name', ''),
-                dob=payload.get('dob'),
-                gender=payload.get('gender', 'UNKNOWN')
+                first_name=first_name,
+                last_name=last_name,
+                dob=dob,
+                gender=gender
             )
-        else:
-            raise ValidationError("Join request has no person associated.")
         
         # Create membership
         family_membership = FamilyMembership.objects.create(

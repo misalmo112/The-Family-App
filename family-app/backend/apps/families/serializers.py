@@ -6,22 +6,11 @@ class FamilySerializer(serializers.ModelSerializer):
     """Serializer for Family model"""
     code = serializers.CharField(read_only=True)
     created_by = serializers.StringRelatedField(read_only=True)
-    # Optional person profile fields for family creation
-    first_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    last_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    dob = serializers.DateField(write_only=True, required=False, allow_null=True)
-    gender = serializers.ChoiceField(
-        choices=['MALE', 'FEMALE', 'OTHER', 'UNKNOWN'],
-        write_only=True,
-        required=False,
-        allow_blank=True
-    )
     
     class Meta:
         model = Family
         fields = [
-            'id', 'name', 'code', 'created_by', 'created_at', 'updated_at',
-            'first_name', 'last_name', 'dob', 'gender'
+            'id', 'name', 'code', 'created_by', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'code', 'created_by', 'created_at', 'updated_at']
 
@@ -65,15 +54,11 @@ class JoinRequestCreateSerializer(serializers.Serializer):
     new_person_payload = serializers.DictField(required=False, allow_null=True)
     
     def validate(self, attrs):
-        """Validate that either chosen_person_id or new_person_payload is provided"""
+        """Validate join request parameters"""
         chosen_person_id = attrs.get('chosen_person_id')
         new_person_payload = attrs.get('new_person_payload')
         
-        if not chosen_person_id and not new_person_payload:
-            raise serializers.ValidationError(
-                "Either chosen_person_id or new_person_payload must be provided."
-            )
-        
+        # Cannot provide both chosen_person_id and new_person_payload
         if chosen_person_id and new_person_payload:
             raise serializers.ValidationError(
                 "Cannot provide both chosen_person_id and new_person_payload."
@@ -85,11 +70,11 @@ class JoinRequestCreateSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     "new_person_payload must be a dictionary."
                 )
-            # Note: first_name and last_name are optional, but at least one should be present
-            if 'first_name' not in new_person_payload and 'last_name' not in new_person_payload:
-                raise serializers.ValidationError(
-                    "new_person_payload must contain at least 'first_name' or 'last_name'."
-                )
+            # Note: new_person_payload fields are optional - if not provided or empty,
+            # backend will use user profile data during approval
+        
+        # If neither chosen_person_id nor new_person_payload is provided,
+        # backend will use user profile data automatically (no validation error)
         
         return attrs
 

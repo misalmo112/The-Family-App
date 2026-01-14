@@ -12,20 +12,10 @@ export const getFamilies = async () => {
 /**
  * Create a new family
  * @param {string} name - Family name
- * @param {Object} personData - Optional person profile data
- * @param {string} personData.first_name - First name
- * @param {string} personData.last_name - Last name
- * @param {string} personData.dob - Date of birth (YYYY-MM-DD)
- * @param {string} personData.gender - Gender (MALE, FEMALE, OTHER, UNKNOWN)
  * @returns {Promise<Object>} Created family object
  */
-export const createFamily = async (name, personData = {}) => {
+export const createFamily = async (name) => {
   const payload = { name };
-  if (personData.first_name) payload.first_name = personData.first_name;
-  if (personData.last_name) payload.last_name = personData.last_name;
-  if (personData.dob) payload.dob = personData.dob;
-  if (personData.gender) payload.gender = personData.gender;
-  
   const response = await api.post('/api/families/', payload);
   return response.data;
 };
@@ -35,7 +25,7 @@ export const createFamily = async (name, personData = {}) => {
  * @param {Object} params - Join request parameters
  * @param {string} params.code - Family code (8 characters)
  * @param {number} [params.chosen_person_id] - Optional person ID if joining as existing person
- * @param {Object} [params.new_person_payload] - Optional person data for new person
+ * @param {Object} [params.new_person_payload] - Optional person data for new person (if not provided, user profile data will be used)
  * @param {string} [params.new_person_payload.first_name] - First name
  * @param {string} [params.new_person_payload.last_name] - Last name
  * @param {string} [params.new_person_payload.dob] - Date of birth (YYYY-MM-DD)
@@ -46,6 +36,7 @@ export const submitJoinRequest = async ({ code, chosen_person_id, new_person_pay
   const payload = { code };
   if (chosen_person_id) payload.chosen_person_id = chosen_person_id;
   if (new_person_payload) payload.new_person_payload = new_person_payload;
+  // If neither chosen_person_id nor new_person_payload is provided, backend will use user profile data
   
   const response = await api.post('/api/families/join/', payload);
   return response.data;

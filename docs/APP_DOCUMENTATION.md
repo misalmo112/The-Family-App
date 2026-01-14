@@ -62,21 +62,46 @@ Only core relationships are stored:
 
 All other relationships are derived dynamically by graph traversal.
 
+### User Profile Module
+
+The User model extends AbstractUser with additional profile fields:
+- `email` - Unique email address (required)
+- `first_name` - First name (from AbstractUser)
+- `last_name` - Last name (from AbstractUser)
+- `dob` - Date of birth (optional)
+- `gender` - Gender (MALE, FEMALE, OTHER, UNKNOWN, default: UNKNOWN)
+
+**Profile Default Behavior:**
+When creating a family or joining a family, if personal information is not explicitly provided, the system automatically uses the user's profile data:
+- Family creation: The creator's Person node uses `user.first_name`, `user.last_name`, `user.dob`, and `user.gender`
+- Join requests: If `new_person_payload` is not provided or is partial, missing fields are filled from the user's profile when the request is approved
+
+This ensures consistency across families and reduces data entry for users who belong to multiple families.
+
+**Endpoints:**
+- `POST /api/auth/register/` - Register new user (public)
+- `GET /api/auth/me/` - Get current user profile (authenticated)
+- `PATCH /api/auth/me/` - Update user profile (authenticated, partial updates allowed)
+- `POST /api/auth/change-password/` - Change password (authenticated)
+
 ---
 
 ## 4) Flow Structure (User Journeys)
 
 ### A) Authentication
-1. User logs in via JWT endpoint.
-2. Access token stored in browser localStorage.
-3. Token attached to API calls.
+1. User registers via `/api/auth/register/` or logs in via JWT endpoint.
+2. Registration automatically returns JWT tokens for immediate use.
+3. Access token stored in browser localStorage.
+4. Token attached to API calls.
 
 ### B) First-Time User (Onboarding)
-1. User lands on onboarding if they have no families.
-2. They can:
-   - Create a new family (becomes admin).
-   - Join an existing family using a code.
-3. If joining, request stays pending until admin approval.
+1. User registers account (or logs in if already registered).
+2. User lands on onboarding if they have no families.
+3. They can:
+   - Create a new family (becomes admin, Person created from user profile).
+   - Join an existing family using a code (Person created from user profile or provided data).
+4. If joining, request stays pending until admin approval.
+5. On approval, Person node is created using user profile data if not provided in join request.
 
 ### C) Family Selection
 1. User selects an active family.
@@ -160,7 +185,7 @@ Root: `family-app/backend/`
 
 Key apps:
 - `apps.core` - health check, shared utilities.
-- `apps.accounts` - custom User model, JWT endpoints.
+- `apps.accounts` - custom User model, JWT endpoints, registration, profile management.
 - `apps.families` - Family, Membership, JoinRequest and services.
 - `apps.graph` - Person, Relationship, topology, relationship resolver.
 - `apps.feed` - Post creation and feed listing.
@@ -194,6 +219,10 @@ Routing:
 Auth:
 - `POST /api/auth/token/`
 - `POST /api/auth/token/refresh/`
+- `POST /api/auth/register/` - User registration
+- `GET /api/auth/me/` - Get user profile
+- `PATCH /api/auth/me/` - Update user profile
+- `POST /api/auth/change-password/` - Change password
 
 Families:
 - `GET /api/families/`

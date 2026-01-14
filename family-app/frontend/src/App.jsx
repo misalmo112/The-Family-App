@@ -4,6 +4,8 @@ import SuperadminGuard from './routes/SuperadminGuard';
 import AppShell from './components/AppShell';
 import SuperadminLayout from './components/SuperadminLayout';
 import Login from './pages/Login';
+import Register from './pages/Register';
+import Profile from './pages/Profile';
 import Families from './pages/Families';
 import Feed from './pages/Feed';
 import Topology from './pages/Topology';
@@ -24,6 +26,7 @@ function App({ RouterComponent = BrowserRouter }) {
     <RouterComponent>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         <Route
           path="/"
           element={
@@ -39,6 +42,7 @@ function App({ RouterComponent = BrowserRouter }) {
           <Route path="post" element={<Post />} />
           <Route path="join" element={<JoinFamily />} />
           <Route path="admin/join-requests" element={<AdminJoinRequests />} />
+          <Route path="profile" element={<Profile />} />
         </Route>
         <Route
           path="/onboarding"
