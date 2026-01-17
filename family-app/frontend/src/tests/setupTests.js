@@ -1,21 +1,22 @@
-import { expect, beforeAll, afterEach, afterAll } from 'vitest';
+import { expect, afterEach } from 'vitest';
 import * as matchers from '@testing-library/jest-dom/matchers';
-import { server } from './msw/server.js';
+import { cleanup } from '@testing-library/react';
 
 // Extend Vitest's expect with jest-dom matchers
 expect.extend(matchers);
 
-// Start MSW server before all tests
-beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'error' });
-});
-
-// Reset handlers after each test to ensure test isolation
+// Ensure the DOM is reset between tests (prevents test leakage in Vitest)
 afterEach(() => {
-  server.resetHandlers();
+  cleanup();
 });
 
-// Close MSW server after all tests
-afterAll(() => {
-  server.close();
-});
+// Mock IntersectionObserver for jsdom (used by infinite scroll)
+globalThis.IntersectionObserver = class IntersectionObserver {
+  constructor() {}
+  disconnect() {}
+  observe() {}
+  takeRecords() {
+    return [];
+  }
+  unobserve() {}
+};

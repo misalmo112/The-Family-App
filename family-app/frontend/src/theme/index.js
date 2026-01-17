@@ -1,11 +1,11 @@
 import { createTheme } from '@mui/material/styles';
 
-// Custom color palette
+// Custom color palette - WhatsApp-inspired
 const colors = {
   primary: {
-    main: '#1976d2',
-    light: '#42a5f5',
-    dark: '#1565c0',
+    main: '#00a884', // WhatsApp green
+    light: '#25d366',
+    dark: '#075e54',
     contrastText: '#fff',
   },
   secondary: {
@@ -46,13 +46,14 @@ export const lightTheme = createTheme({
     mode: 'light',
     ...colors,
     background: {
-      default: '#f5f5f5',
+      default: '#f0f2f5', // Slightly warmer gray
       paper: '#ffffff',
     },
     text: {
       primary: 'rgba(0, 0, 0, 0.87)',
-      secondary: 'rgba(0, 0, 0, 0.6)',
+      secondary: 'rgba(0, 0, 0, 0.65)', // Improved contrast
     },
+    divider: 'rgba(0, 0, 0, 0.12)',
   },
   typography: {
     fontFamily: [
@@ -178,6 +179,20 @@ export const lightTheme = createTheme({
         },
       },
     },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          transition: 'box-shadow 0.2s ease, transform 0.2s ease',
+        },
+      },
+    },
+    MuiListItemButton: {
+      styleOverrides: {
+        root: {
+          transition: 'background-color 0.2s ease, border-color 0.2s ease',
+        },
+      },
+    },
   },
 });
 
@@ -262,6 +277,20 @@ export const darkTheme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 6,
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          transition: 'box-shadow 0.2s ease, transform 0.2s ease',
+        },
+      },
+    },
+    MuiListItemButton: {
+      styleOverrides: {
+        root: {
+          transition: 'background-color 0.2s ease, border-color 0.2s ease',
         },
       },
     },

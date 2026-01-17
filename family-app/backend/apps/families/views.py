@@ -177,3 +177,28 @@ class MyJoinRequestsView(APIView):
         
         serializer = JoinRequestListSerializer(join_requests, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class FamilyAdminCheckView(APIView):
+    """Check if current user is admin of a family"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, family_id):
+        """Check if user is admin of the family"""
+        try:
+            family = Family.objects.get(id=family_id)
+        except Family.DoesNotExist:
+            return Response(
+                {'error': 'Family not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if user is admin
+        is_admin = FamilyMembership.objects.filter(
+            user=request.user,
+            family=family,
+            role=FamilyMembership.Role.ADMIN,
+            status=FamilyMembership.Status.ACTIVE
+        ).exists()
+        
+        return Response({'is_admin': is_admin}, status=status.HTTP_200_OK)

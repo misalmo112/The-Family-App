@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Onboarding Mockup</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-badge"></span>
+          Family Network
+        </div>
+        <nav class="nav">
+          <a href="index.html">Index</a>
+          <a href="feed.html">Feed</a>
+          <a href="profile.html">Profile</a>
+          <a class="active" href="onboarding.html">Onboarding</a>
+        </nav>
+      </header>
+
+      <section class="card hero" style="margin-top: 18px;">
+        <h1 class="title">Start your family space</h1>
+        <p class="subtle">
+          Create a new family or join one with a private code. Your profile
+          data is reused automatically.
+        </p>
+        <div class="grid-links">
+          <div class="card link-card">
+            <span class="badge">Create</span>
+            <strong>Create a new family</strong>
+            <span class="subtle">Become the admin and invite others.</span>
+            <button class="btn primary" style="margin-top: auto;">Start</button>
+          </div>
+          <div class="card link-card">
+            <span class="badge coral">Join</span>
+            <strong>Join existing family</strong>
+            <span class="subtle">Use the 8 character family code.</span>
+            <button class="btn ghost" style="margin-top: auto;">Join</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" style="margin-top: 18px; padding: 22px;">
+        <div class="section-title">Create family flow</div>
+        <div class="stepper">
+          <span class="step active">Family name</span>
+          <span class="step">Confirm profile</span>
+          <span class="step">Share code</span>
+        </div>
+
+        <div class="form-grid">
+          <input class="input" placeholder="Family name" />
+          <input class="input" placeholder="Family nickname (optional)" />
+        </div>
+
+        <div class="section-title" style="margin-top: 16px;">Profile snapshot</div>
+        <div class="post-card">
+          <div class="post-header">
+            <div>
+              <div class="post-title">Using your saved profile</div>
+              <div class="meta">Edit profile to update name, dob, or gender.</div>
+            </div>
+            <button class="btn ghost">Edit profile</button>
+          </div>
+        </div>
+
+        <div style="margin-top: 16px; display: flex; gap: 10px;">
+          <button class="btn ghost">Back</button>
+          <button class="btn primary">Continue</button>
+        </div>
+        <div class="footer-note">
+          A unique family code will be generated after creation.
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

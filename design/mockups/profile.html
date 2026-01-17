@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Person Profile Mockup</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-badge"></span>
+          Family Network
+        </div>
+        <nav class="nav">
+          <a href="index.html">Index</a>
+          <a href="feed.html">Feed</a>
+          <a class="active" href="profile.html">Profile</a>
+          <a href="onboarding.html">Onboarding</a>
+        </nav>
+      </header>
+
+      <section class="profile-hero card" style="margin-top: 18px;">
+        <div class="avatar">OA</div>
+        <div>
+          <h1 class="title" style="margin: 0;">Omar Abdallah</h1>
+          <p class="subtle">Father, Admin in Smith Family</p>
+          <div class="badge">Active family: Smith</div>
+        </div>
+        <div class="profile-actions">
+          <div class="toggle">
+            <span class="dot"></span>
+            All families
+          </div>
+          <button class="btn ghost">Message</button>
+        </div>
+      </section>
+
+      <div class="profile-grid">
+        <section class="card" style="padding: 18px;">
+          <div class="stats">
+            <div class="stat">
+              <div class="post-title">42</div>
+              <div class="meta">Posts</div>
+            </div>
+            <div class="stat">
+              <div class="post-title">3</div>
+              <div class="meta">Families</div>
+            </div>
+            <div class="stat">
+              <div class="post-title">128</div>
+              <div class="meta">Comments</div>
+            </div>
+          </div>
+
+          <div class="section-title" style="margin-top: 16px;">Posts</div>
+
+          <div class="post-card">
+            <div class="post-header">
+              <div>
+                <div class="post-title">Reunion agenda</div>
+                <div class="meta">Posted 2 hours ago</div>
+              </div>
+              <span class="badge">Smith Family</span>
+            </div>
+            <div class="post-body">
+              Drafting the agenda for July. Please review the shared doc and
+              leave comments by Friday.
+            </div>
+            <div class="post-actions">
+              <span>8 comments</span>
+              <span>View</span>
+            </div>
+          </div>
+
+          <div class="post-card">
+            <div class="post-header">
+              <div>
+                <div class="post-title">Birthday archive update</div>
+                <div class="meta">Posted yesterday</div>
+              </div>
+              <span class="badge">Hassan Family</span>
+            </div>
+            <div class="post-body">
+              Uploaded the last three birthday notes for the archive. Please
+              add any missing dates or photos.
+            </div>
+            <div class="post-actions">
+              <span>5 comments</span>
+              <span>View</span>
+            </div>
+          </div>
+
+          <div class="post-card">
+            <div class="post-header">
+              <div>
+                <div class="post-title">Story from 1988</div>
+                <div class="meta">Posted last week</div>
+              </div>
+              <span class="badge">Smith Family</span>
+            </div>
+            <div class="post-body">
+              Sharing a story about the first family business opening. It may
+              help with the upcoming family history project.
+            </div>
+            <div class="post-actions">
+              <span>12 comments</span>
+              <span>View</span>
+            </div>
+          </div>
+        </section>
+
+        <aside class="card" style="padding: 18px;">
+          <div class="section-title">Family Memberships</div>
+          <div class="stack">
+            <div class="pill">Smith Family - Admin</div>
+            <div class="pill">Hassan Family - Member</div>
+            <div class="pill">Amin Family - Member</div>
+          </div>
+
+          <div class="section-title" style="margin-top: 16px;">Profile Notes</div>
+          <div class="post-card">
+            <div class="meta">
+              Profile posts shown here respect the active family context unless
+              the user is viewing their own profile and toggles all families.
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="page-spacer"></div>
+    </main>
+  </body>
+</html>

@@ -1,7 +1,1 @@
-import HomeFeed from './HomeFeed';
-
-const Feed = () => {
-  return <HomeFeed />;
-};
-
-export default Feed;
+export { default } from './Feed/index';

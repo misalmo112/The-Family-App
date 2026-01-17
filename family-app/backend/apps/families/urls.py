@@ -10,4 +10,5 @@ urlpatterns = [
     path('join-requests/<int:pk>/approve/', views.JoinRequestApproveView.as_view(), name='join-request-approve'),
     path('join-requests/<int:pk>/reject/', views.JoinRequestRejectView.as_view(), name='join-request-reject'),
     path('my-join-requests/', views.MyJoinRequestsView.as_view(), name='my-join-requests'),
+    path('<int:family_id>/is_admin/', views.FamilyAdminCheckView.as_view(), name='family-admin-check'),
 ]

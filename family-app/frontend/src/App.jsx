@@ -6,6 +6,8 @@ import SuperadminLayout from './components/SuperadminLayout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
+import Settings from './pages/Settings';
+import PersonProfile from './pages/PersonProfile';
 import Families from './pages/Families';
 import Feed from './pages/Feed';
 import Topology from './pages/Topology';
@@ -43,6 +45,8 @@ function App({ RouterComponent = BrowserRouter }) {
           <Route path="join" element={<JoinFamily />} />
           <Route path="admin/join-requests" element={<AdminJoinRequests />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="people/:personId" element={<PersonProfile />} />
         </Route>
         <Route
           path="/onboarding"

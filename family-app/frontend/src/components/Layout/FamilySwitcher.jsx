@@ -72,33 +72,21 @@ const FamilySwitcher = () => {
 
   return (
     <FormControl
+      fullWidth
       size="small"
       sx={{
-        minWidth: 180,
         '& .MuiOutlinedInput-root': {
-          backgroundColor: 'background.paper',
+          backgroundColor: 'background.default',
         },
       }}
     >
-      <InputLabel id="family-switcher-label">Family</InputLabel>
+      <InputLabel id="family-switcher-label">Active Family</InputLabel>
       <Select
         labelId="family-switcher-label"
         id="family-switcher"
         value={activeFamilyId || ''}
-        label="Family"
+        label="Active Family"
         onChange={handleFamilyChange}
-        sx={{
-          color: 'inherit',
-          '& .MuiOutlinedInput-notchedOutline': {
-            borderColor: 'rgba(255, 255, 255, 0.23)',
-          },
-          '&:hover .MuiOutlinedInput-notchedOutline': {
-            borderColor: 'rgba(255, 255, 255, 0.4)',
-          },
-          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-            borderColor: 'rgba(255, 255, 255, 0.4)',
-          },
-        }}
       >
         {!activeFamilyId && (
           <MenuItem value="">

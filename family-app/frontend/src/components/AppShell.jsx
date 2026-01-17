@@ -1,11 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Button,
-  Container,
   Box,
   IconButton,
   Drawer,
@@ -18,40 +13,47 @@ import {
   Menu,
   MenuItem,
   Avatar,
+  Paper,
+  Typography,
   useTheme,
   useMediaQuery,
+  Badge,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  Home as HomeIcon,
-  Article as ArticleIcon,
+  Chat as ChatIcon,
+  People as PeopleIcon,
   AccountTree as AccountTreeIcon,
   AddCircle as AddCircleIcon,
   GroupAdd as GroupAddIcon,
   AdminPanelSettings as AdminPanelSettingsIcon,
   Logout as LogoutIcon,
   Person as PersonIcon,
-  FamilyRestroom as FamilyRestroomIcon,
-  Security as SecurityIcon,
+  Settings as SettingsIcon,
+  MoreVert as MoreVertIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { useFamily } from '../context/FamilyContext';
 import FamilySwitcher from './Layout/FamilySwitcher';
 
-const drawerWidth = 280;
+const sidebarWidth = 360;
+const collapsedSidebarWidth = 72;
 
 const navigationItems = [
-  { path: '/families', label: 'Families', icon: <FamilyRestroomIcon /> },
-  { path: '/feed', label: 'Feed', icon: <ArticleIcon /> },
-  { path: '/topology', label: 'Topology', icon: <AccountTreeIcon /> },
-  { path: '/post', label: 'Create Post', icon: <AddCircleIcon /> },
-  { path: '/join', label: 'Join Family', icon: <GroupAddIcon /> },
-  { path: '/admin/join-requests', label: 'Join Requests', icon: <AdminPanelSettingsIcon /> },
-  { path: '/profile', label: 'Profile', icon: <PersonIcon /> },
-  { path: '/superadmin', label: 'Superadmin', icon: <SecurityIcon /> },
+  { path: '/feed', label: 'Chats', icon: <ChatIcon />, badge: null },
+  { path: '/families', label: 'Families', icon: <PeopleIcon />, badge: null },
+  { path: '/topology', label: 'Topology', icon: <AccountTreeIcon />, badge: null },
+  { path: '/post', label: 'Create Post', icon: <AddCircleIcon />, badge: null },
+  { path: '/join', label: 'Join Family', icon: <GroupAddIcon />, badge: null },
+  { path: '/admin/join-requests', label: 'Join Requests', icon: <AdminPanelSettingsIcon />, badge: null },
+  { path: '/profile', label: 'Profile', icon: <PersonIcon />, badge: null },
 ];
 
 const AppShell = () => {
   const { logout } = useAuth();
+  const { activeFamilyName } = useFamily();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -59,6 +61,21 @@ const AppShell = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const userMenuOpen = Boolean(anchorEl);
+  
+  // Sidebar collapse state - persist in localStorage
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  // Save sidebar state to localStorage
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
+  const handleSidebarToggle = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
 
   const handleLogout = () => {
     logout();
@@ -85,168 +102,295 @@ const AppShell = () => {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
-  const drawer = (
-    <Box>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div">
-          Family App
-        </Typography>
-      </Toolbar>
-      <Divider />
-      <List>
-        {navigationItems.map((item) => (
-          <ListItem key={item.path} disablePadding>
-            <ListItemButton
-              component={Link}
-              to={item.path}
-              selected={isActiveRoute(item.path)}
-              onClick={() => isMobile && setMobileOpen(false)}
-            >
-              <ListItemIcon sx={{ color: isActiveRoute(item.path) ? 'primary.main' : 'inherit' }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.label} />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
+  const getInitials = (name) => {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  const sidebarContent = (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Sidebar Header */}
+      <Box
+        sx={{
+          p: sidebarCollapsed ? 1.5 : 2,
+          bgcolor: 'background.paper',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+          gap: sidebarCollapsed ? 0 : 2,
+          justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+        }}
+      >
+        {!sidebarCollapsed && (
+          <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
+            <PersonIcon />
+          </Avatar>
+        )}
+        {sidebarCollapsed && (
+          <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}>
+            <PersonIcon fontSize="small" />
+          </Avatar>
+        )}
+        {!sidebarCollapsed && (
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="subtitle1" fontWeight={600} noWrap>
+              Family App
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {activeFamilyName || 'Select a family'}
+            </Typography>
+          </Box>
+        )}
+        {!sidebarCollapsed && (
+          <IconButton
+            onClick={handleUserMenuClick}
+            size="small"
+            aria-controls={userMenuOpen ? 'account-menu' : undefined}
+          >
+            <MoreVertIcon />
+          </IconButton>
+        )}
+        {!isMobile && (
+          <IconButton
+            onClick={handleSidebarToggle}
+            size="small"
+            sx={{ 
+              ml: sidebarCollapsed ? 0 : 'auto',
+              position: 'relative',
+            }}
+            aria-label={sidebarCollapsed ? 'expand sidebar' : 'collapse sidebar'}
+          >
+            {sidebarCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+          </IconButton>
+        )}
+      </Box>
+
+      {/* Family Switcher */}
+      {!sidebarCollapsed && (
+        <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <FamilySwitcher />
+        </Box>
+      )}
+
+      {/* Navigation List */}
+      <Box sx={{ flex: 1, overflow: 'auto', pb: sidebarCollapsed ? 8 : 0 }}>
+        <List sx={{ p: 0 }}>
+          {navigationItems.map((item) => (
+            <ListItem key={item.path} disablePadding>
+              <ListItemButton
+                component={Link}
+                to={item.path}
+                selected={isActiveRoute(item.path)}
+                onClick={() => isMobile && setMobileOpen(false)}
+                sx={{
+                  py: 1.5,
+                  px: sidebarCollapsed ? 1.5 : 2,
+                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                  '&.Mui-selected': {
+                    bgcolor: 'action.selected',
+                    borderLeft: sidebarCollapsed ? 'none' : '3px solid',
+                    borderColor: 'primary.main',
+                    '&:hover': {
+                      bgcolor: 'action.selected',
+                    },
+                  },
+                  '&:hover': {
+                    bgcolor: 'action.hover',
+                  },
+                }}
+              >
+                <ListItemIcon
+                  sx={{
+                    color: isActiveRoute(item.path) ? 'primary.main' : 'text.secondary',
+                    minWidth: sidebarCollapsed ? 0 : 40,
+                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                  }}
+                >
+                  {item.badge ? (
+                    <Badge badgeContent={item.badge} color="error">
+                      {item.icon}
+                    </Badge>
+                  ) : (
+                    item.icon
+                  )}
+                </ListItemIcon>
+                {!sidebarCollapsed && (
+                  <ListItemText
+                    primary={item.label}
+                    primaryTypographyProps={{
+                      fontWeight: isActiveRoute(item.path) ? 600 : 400,
+                    }}
+                  />
+                )}
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+      </Box>
+      
+      {/* Toggle button at bottom when collapsed */}
+      {!isMobile && sidebarCollapsed && (
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 8,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10,
+          }}
+        >
+          <IconButton
+            onClick={handleSidebarToggle}
+            size="small"
+            sx={{
+              bgcolor: 'background.paper',
+              boxShadow: 2,
+              '&:hover': {
+                bgcolor: 'action.hover',
+              },
+            }}
+            aria-label="expand sidebar"
+          >
+            <ChevronRightIcon />
+          </IconButton>
+        </Box>
+      )}
     </Box>
   );
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static" elevation={2}>
-        <Toolbar>
-          {isMobile && (
-            <IconButton
-              color="inherit"
-              aria-label="open drawer"
-              edge="start"
-              onClick={handleDrawerToggle}
-              sx={{ mr: 2 }}
-            >
-              <MenuIcon />
-            </IconButton>
-          )}
-          <Typography
-            variant="h6"
-            component={Link}
-            to="/families"
-            sx={{
-              flexGrow: { xs: 1, md: 0 },
-              mr: { xs: 0, md: 4 },
-              textDecoration: 'none',
-              color: 'inherit',
-              fontWeight: 600,
-            }}
-          >
-            Family App
-          </Typography>
-          {!isMobile && (
-            <Box sx={{ display: 'flex', gap: 1, flexGrow: 1, ml: 2 }}>
-              {navigationItems.slice(0, 3).map((item) => (
-                <Button
-                  key={item.path}
-                  color="inherit"
-                  component={Link}
-                  to={item.path}
-                  startIcon={item.icon}
-                  sx={{
-                    backgroundColor: isActiveRoute(item.path) ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                    '&:hover': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                    },
-                  }}
-                >
-                  {item.label}
-                </Button>
-              ))}
-            </Box>
-          )}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, ml: 'auto' }}>
-            <FamilySwitcher />
-            <IconButton
-              onClick={handleUserMenuClick}
-              size="small"
-              sx={{ ml: 2 }}
-              aria-controls={userMenuOpen ? 'account-menu' : undefined}
-              aria-hovered={userMenuOpen ? 'true' : undefined}
-              aria-expanded={userMenuOpen ? 'true' : undefined}
-            >
-              <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
-                <PersonIcon />
-              </Avatar>
-            </IconButton>
-            <Menu
-              anchorEl={anchorEl}
-              id="account-menu"
-              open={userMenuOpen}
-              onClose={handleUserMenuClose}
-              onClick={handleUserMenuClose}
-              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-            >
-              <MenuItem
-                onClick={() => {
-                  navigate('/profile');
-                  handleUserMenuClose();
-                }}
-              >
-                <ListItemIcon>
-                  <PersonIcon fontSize="small" />
-                </ListItemIcon>
-                Profile
-              </MenuItem>
-              <MenuItem onClick={handleLogout}>
-                <ListItemIcon>
-                  <LogoutIcon fontSize="small" />
-                </ListItemIcon>
-                Logout
-              </MenuItem>
-            </Menu>
-          </Box>
-        </Toolbar>
-      </AppBar>
-      {isMobile && (
+    <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'background.default', overflow: 'hidden' }}>
+      {/* Left Sidebar - WhatsApp style */}
+      {isMobile ? (
         <Drawer
           variant="temporary"
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
+            keepMounted: true,
           }}
           sx={{
             display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+              width: sidebarWidth,
+              borderRight: '1px solid',
+              borderColor: 'divider',
+            },
           }}
         >
-          {drawer}
+          {sidebarContent}
         </Drawer>
-      )}
-      {!isMobile && (
-        <Drawer
-          variant="permanent"
+      ) : (
+        <Paper
+          elevation={0}
           sx={{
-            display: { xs: 'none', md: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            width: sidebarCollapsed ? collapsedSidebarWidth : sidebarWidth,
+            display: { xs: 'none', md: 'flex' },
+            flexDirection: 'column',
+            borderRight: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+            height: '100vh',
+            position: 'relative',
+            zIndex: 1,
+            overflow: 'hidden',
+            transition: 'width 0.3s ease',
           }}
-          open
         >
-          {drawer}
-        </Drawer>
+          {sidebarContent}
+        </Paper>
       )}
+
+      {/* Mobile Menu Button */}
+      {isMobile && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 8,
+            left: 8,
+            zIndex: 1300,
+            bgcolor: 'background.paper',
+            borderRadius: 1,
+            boxShadow: 2,
+          }}
+        >
+          <IconButton
+            onClick={handleDrawerToggle}
+            aria-label="open drawer"
+            size="small"
+            sx={{ p: 1 }}
+          >
+            <MenuIcon />
+          </IconButton>
+        </Box>
+      )}
+
+      {/* Main Content Area */}
       <Box
         component="main"
         sx={{
-          flexGrow: 1,
-          width: { md: `calc(100% - ${drawerWidth}px)` },
-          ml: { md: `${drawerWidth}px` },
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100vh',
+          overflow: 'auto',
+          bgcolor: 'background.default',
+          width: { 
+            xs: '100%', 
+            md: `calc(100% - ${sidebarCollapsed ? collapsedSidebarWidth : sidebarWidth}px)` 
+          },
+          transition: 'width 0.3s ease',
         }}
       >
-        <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 2, sm: 3 } }}>
-          <Outlet />
-        </Container>
+        <Outlet />
       </Box>
+
+      {/* User Menu */}
+      <Menu
+        anchorEl={anchorEl}
+        id="account-menu"
+        open={userMenuOpen}
+        onClose={handleUserMenuClose}
+        onClick={handleUserMenuClose}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <MenuItem
+          onClick={() => {
+            navigate('/profile');
+            handleUserMenuClose();
+          }}
+        >
+          <ListItemIcon>
+            <PersonIcon fontSize="small" />
+          </ListItemIcon>
+          Profile
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            navigate('/settings');
+            handleUserMenuClose();
+          }}
+        >
+          <ListItemIcon>
+            <SettingsIcon fontSize="small" />
+          </ListItemIcon>
+          Settings
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={handleLogout}>
+          <ListItemIcon>
+            <LogoutIcon fontSize="small" />
+          </ListItemIcon>
+          Logout
+        </MenuItem>
+      </Menu>
     </Box>
   );
 };

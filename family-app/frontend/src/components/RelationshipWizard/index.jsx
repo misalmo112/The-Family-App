@@ -26,12 +26,23 @@ import StepReview from './StepReview';
 import { translateLabel, validateRelationship } from '../../services/relationshipTranslator';
 import { createRelationship } from '../../services/graph';
 
-const steps = [
-  { label: 'Select Person', icon: PersonIcon },
-  { label: 'Choose Relationship', icon: LabelIcon },
-  { label: 'Select Other Person', icon: PersonIcon },
-  { label: 'Review', icon: PreviewIcon },
-];
+// Step labels - will be adjusted based on admin status
+const getSteps = (isAdmin) => {
+  if (isAdmin) {
+    return [
+      { label: 'Who is adding the relationship?', icon: PersonIcon },
+      { label: 'How are they related?', icon: LabelIcon },
+      { label: 'Who is the other person?', icon: PersonIcon },
+      { label: 'Confirm Relationship', icon: PreviewIcon },
+    ];
+  } else {
+    return [
+      { label: 'How are you related?', icon: LabelIcon },
+      { label: 'Who is the other person?', icon: PersonIcon },
+      { label: 'Confirm Relationship', icon: PreviewIcon },
+    ];
+  }
+};
 
 /**
  * Relationship Wizard Component
@@ -44,6 +55,8 @@ const RelationshipWizard = ({
   persons, 
   topology, 
   viewerPersonId,
+  currentUserPersonId,
+  isAdmin,
   onSuccess 
 }) => {
   const [activeStep, setActiveStep] = useState(0);
@@ -56,11 +69,23 @@ const RelationshipWizard = ({
   const [submitting, setSubmitting] = useState(false);
   const [disabledLabels, setDisabledLabels] = useState([]);
 
+  // Get steps based on admin status
+  const steps = getSteps(isAdmin);
+  
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (open) {
+      // For regular users, start at step 0 (which is step 2 in the original flow)
+      // For admins, start at step 0 (step 1 in original flow)
       setActiveStep(0);
-      setSelectedPersonId(viewerPersonId || (persons.length > 0 ? persons[0].id : null));
+      
+      // Auto-set selected person for regular users
+      if (!isAdmin && currentUserPersonId) {
+        setSelectedPersonId(currentUserPersonId);
+      } else {
+        setSelectedPersonId(viewerPersonId || (persons.length > 0 ? persons[0].id : null));
+      }
+      
       setSelectedLabel(null);
       setTargetPersonId(null);
       setSearchTerm1('');
@@ -68,7 +93,7 @@ const RelationshipWizard = ({
       setError(null);
       setDisabledLabels([]);
     }
-  }, [open, viewerPersonId, persons]);
+  }, [open, viewerPersonId, persons, isAdmin, currentUserPersonId]);
 
   // Update disabled labels when person selection changes
   useEffect(() => {
@@ -88,22 +113,28 @@ const RelationshipWizard = ({
   const handleNext = () => {
     setError(null);
     
-    if (activeStep === 0 && !selectedPersonId) {
+    // Adjust step indices based on admin status
+    const step1Index = isAdmin ? 0 : -1; // Step 1 only exists for admins
+    const step2Index = isAdmin ? 1 : 0; // Choose relationship
+    const step3Index = isAdmin ? 2 : 1; // Select other person
+    const step4Index = isAdmin ? 3 : 2; // Review
+    
+    if (activeStep === step1Index && !selectedPersonId) {
       setError('Please select a person');
       return;
     }
     
-    if (activeStep === 1 && !selectedLabel) {
+    if (activeStep === step2Index && !selectedLabel) {
       setError('Please select a relationship type');
       return;
     }
     
-    if (activeStep === 2 && !targetPersonId) {
+    if (activeStep === step3Index && !targetPersonId) {
       setError('Please select the other person');
       return;
     }
 
-    if (activeStep === 3) {
+    if (activeStep === step4Index) {
       handleSubmit();
       return;
     }
@@ -216,64 +247,81 @@ const RelationshipWizard = ({
   };
 
   const renderStepContent = () => {
-    switch (activeStep) {
-      case 0:
-        return (
-          <StepSelectPerson
-            persons={persons}
-            selectedPersonId={selectedPersonId}
-            onSelectPerson={handlePersonSelect}
-            viewerPersonId={viewerPersonId}
-            searchTerm={searchTerm1}
-            onSearchChange={setSearchTerm1}
-          />
-        );
-      
-      case 1:
-        return (
-          <StepSelectLabel
-            selectedLabel={selectedLabel}
-            onSelectLabel={handleLabelSelect}
-            disabledLabels={disabledLabels}
-            topology={topology}
-            viewerId={selectedPersonId}
-            targetId={targetPersonId}
-          />
-        );
-      
-      case 2:
-        return (
-          <StepSelectPerson
-            persons={persons.filter(p => p.id !== selectedPersonId)}
-            selectedPersonId={targetPersonId}
-            onSelectPerson={handleTargetSelect}
-            viewerPersonId={viewerPersonId}
-            searchTerm={searchTerm2}
-            onSearchChange={setSearchTerm2}
-          />
-        );
-      
-      case 3:
-        return (
-          <StepReview
-            viewerId={selectedPersonId}
-            targetId={targetPersonId}
-            label={selectedLabel}
-            topology={topology}
-            persons={persons}
-          />
-        );
-      
-      default:
-        return null;
+    // Adjust step indices based on admin status
+    const step1Index = isAdmin ? 0 : -1; // Step 1 only exists for admins
+    const step2Index = isAdmin ? 1 : 0; // Choose relationship
+    const step3Index = isAdmin ? 2 : 1; // Select other person
+    const step4Index = isAdmin ? 3 : 2; // Review
+    
+    if (activeStep === step1Index) {
+      // Step 1: Select Person (Admin only)
+      return (
+        <StepSelectPerson
+          persons={persons}
+          selectedPersonId={selectedPersonId}
+          onSelectPerson={handlePersonSelect}
+          viewerPersonId={viewerPersonId}
+          searchTerm={searchTerm1}
+          onSearchChange={setSearchTerm1}
+          topology={topology}
+          currentUserPersonId={currentUserPersonId}
+          stepContext="step1"
+        />
+      );
     }
+    
+    if (activeStep === step2Index) {
+      // Step 2: Choose Relationship
+      return (
+        <StepSelectLabel
+          selectedLabel={selectedLabel}
+          onSelectLabel={handleLabelSelect}
+          disabledLabels={disabledLabels}
+          topology={topology}
+          viewerId={selectedPersonId}
+          targetId={targetPersonId}
+        />
+      );
+    }
+    
+    if (activeStep === step3Index) {
+      // Step 3: Select Other Person
+      return (
+        <StepSelectPerson
+          persons={persons.filter(p => p.id !== selectedPersonId)}
+          selectedPersonId={targetPersonId}
+          onSelectPerson={handleTargetSelect}
+          viewerPersonId={viewerPersonId}
+          searchTerm={searchTerm2}
+          onSearchChange={setSearchTerm2}
+          topology={topology}
+          currentUserPersonId={currentUserPersonId}
+          stepContext="step3"
+          selectedPersonFromStep1={selectedPersonId}
+        />
+      );
+    }
+    
+    if (activeStep === step4Index) {
+      // Step 4: Review
+      return (
+        <StepReview
+          viewerId={selectedPersonId}
+          targetId={targetPersonId}
+          label={selectedLabel}
+          topology={topology}
+          persons={persons}
+        />
+      );
+    }
+    
+    return null;
   };
 
   const getStepLabel = (step) => {
-    if (step === 0) return 'Select Person';
-    if (step === 1) return 'Choose Relationship';
-    if (step === 2) return 'Select Other Person';
-    if (step === 3) return 'Review';
+    if (step < steps.length) {
+      return steps[step].label;
+    }
     return '';
   };
 

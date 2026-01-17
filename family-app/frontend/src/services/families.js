@@ -105,3 +105,23 @@ export const rejectJoinRequest = async (id) => {
     throw error;
   }
 };
+
+/**
+ * Check if the current user is an admin of a family
+ * @param {number} familyId - The family ID
+ * @returns {Promise<boolean>} True if user is admin, false otherwise
+ */
+export const checkIsFamilyAdmin = async (familyId) => {
+  try {
+    const response = await api.get(`/api/families/${familyId}/is_admin/`);
+    return response.data?.is_admin === true;
+  } catch (error) {
+    // If endpoint doesn't exist, return false
+    if (error.response?.status === 404) {
+      console.warn('Admin check endpoint not found, assuming not admin');
+      return false;
+    }
+    console.error('Error checking family admin status:', error);
+    return false;
+  }
+};

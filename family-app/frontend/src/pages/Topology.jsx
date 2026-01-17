@@ -21,6 +21,11 @@ import {
   Grid,
   Divider,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Switch,
+  FormControlLabel,
+  Collapse,
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -32,10 +37,15 @@ import {
   CalendarToday as CalendarIcon,
   AutoAwesome as AutoAwesomeIcon,
   Settings as SettingsIcon,
+  ViewList as ViewListIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { useFamily } from '../context/FamilyContext';
-import { getPersons, getTopology, createRelationship } from '../services/graph';
+import { getPersons, getTopology, createRelationship, getCurrentUserPersonId } from '../services/graph';
+import { checkIsFamilyAdmin } from '../services/families';
 import RelationshipWizard from '../components/RelationshipWizard';
+import FamilyGraph from '../components/FamilyGraph';
 
 const Topology = () => {
   // Always call hook unconditionally - assumes FamilyProvider exists
@@ -67,6 +77,18 @@ const Topology = () => {
   const [loadingTopology, setLoadingTopology] = useState(false);
   const [error, setError] = useState(null);
   
+  // Ego view state
+  const [isFamilyAdmin, setIsFamilyAdmin] = useState(false);
+  const [currentUserPersonId, setCurrentUserPersonId] = useState(null);
+  const [adminViewMode, setAdminViewMode] = useState('ego'); // 'ego' or 'full'
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'graph'
+  const [loadingUserData, setLoadingUserData] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState({
+    immediate: true,
+    extended: true,
+    inlaws: true,
+  });
+  
   // Relationship form state
   const [fromPersonId, setFromPersonId] = useState('');
   const [toPersonId, setToPersonId] = useState('');
@@ -78,6 +100,43 @@ const Topology = () => {
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
   const [showAdvancedMode, setShowAdvancedMode] = useState(false);
+
+  // Fetch user data (person ID and admin status) when activeFamilyId changes
+  useEffect(() => {
+    if (!activeFamilyId) {
+      setCurrentUserPersonId(null);
+      setIsFamilyAdmin(false);
+      return;
+    }
+
+    const fetchUserData = async () => {
+      try {
+        setLoadingUserData(true);
+        const [personId, isAdmin] = await Promise.all([
+          getCurrentUserPersonId(activeFamilyId),
+          checkIsFamilyAdmin(activeFamilyId),
+        ]);
+        setCurrentUserPersonId(personId);
+        setIsFamilyAdmin(isAdmin);
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+      } finally {
+        setLoadingUserData(false);
+      }
+    };
+
+    fetchUserData();
+  }, [activeFamilyId]);
+
+  // Auto-set viewerPersonId for regular users (ego view)
+  useEffect(() => {
+    if (currentUserPersonId && !isFamilyAdmin) {
+      setViewerPersonId(currentUserPersonId);
+    } else if (currentUserPersonId && isFamilyAdmin && adminViewMode === 'ego') {
+      // Admin in ego mode: use current user
+      setViewerPersonId(currentUserPersonId);
+    }
+  }, [currentUserPersonId, isFamilyAdmin, adminViewMode]);
 
   // Fetch persons when activeFamilyId changes
   useEffect(() => {
@@ -95,8 +154,8 @@ const Topology = () => {
         const data = await getPersons({ familyId: activeFamilyId });
         setPersons(data || []);
         
-        // Default to first person if viewer not set
-        if (data && data.length > 0 && !viewerPersonId) {
+        // For admins in full view mode, default to first person if viewer not set
+        if (data && data.length > 0 && isFamilyAdmin && adminViewMode === 'full' && !viewerPersonId) {
           setViewerPersonId(data[0].id);
         }
       } catch (err) {
@@ -118,7 +177,7 @@ const Topology = () => {
     };
 
     fetchPersons();
-  }, [activeFamilyId]);
+  }, [activeFamilyId, isFamilyAdmin, adminViewMode]);
 
   // Function to fetch topology (reusable for refetching)
   const fetchTopologyData = useCallback(async () => {
@@ -192,6 +251,45 @@ const Topology = () => {
 
   const getRelationshipColor = (type) => {
     return type === 'PARENT_OF' ? 'primary' : 'secondary';
+  };
+
+  // Group family members by relationship category
+  const groupNodesByCategory = (nodes) => {
+    if (!nodes || nodes.length === 0) {
+      return { immediate: [], extended: [], inlaws: [] };
+    }
+
+    const immediate = [];
+    const extended = [];
+    const inlaws = [];
+
+    nodes.forEach((node) => {
+      const relation = node.relation_to_viewer?.toLowerCase() || '';
+      const isViewer = node.id === viewerPersonId;
+
+      if (isViewer) {
+        immediate.push(node);
+      } else if (
+        relation.includes('father') ||
+        relation.includes('mother') ||
+        relation.includes('brother') ||
+        relation.includes('sister') ||
+        relation.includes('son') ||
+        relation.includes('daughter') ||
+        relation.includes('spouse') ||
+        relation.includes('husband') ||
+        relation.includes('wife') ||
+        relation === 'self'
+      ) {
+        immediate.push(node);
+      } else if (relation.includes('in-law') || relation.includes('in law')) {
+        inlaws.push(node);
+      } else {
+        extended.push(node);
+      }
+    });
+
+    return { immediate, extended, inlaws };
   };
 
   // Handle relationship form submission
@@ -275,33 +373,68 @@ const Topology = () => {
         </Alert>
       )}
 
-      {/* Viewer Selection Card */}
-      <Card sx={{ mb: 3 }}>
-        <CardHeader
-          title="Select Viewer"
-          subheader="Choose a person to view the family tree from their perspective"
-          avatar={<PersonIcon />}
-        />
-        <CardContent>
-          <FormControl fullWidth>
-            <InputLabel id="viewer-select-label">Viewer Person</InputLabel>
-            <Select
-              labelId="viewer-select-label"
-              id="viewer-select"
-              value={viewerPersonId || ''}
-              label="Viewer Person"
-              onChange={(e) => setViewerPersonId(e.target.value)}
-              disabled={loadingPersons || persons.length === 0}
-            >
-              {persons.map((person) => (
-                <MenuItem key={person.id} value={person.id}>
-                  {person.first_name} {person.last_name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </CardContent>
-      </Card>
+      {/* Admin Controls */}
+      {isFamilyAdmin && (
+        <Card sx={{ mb: 3 }}>
+          <CardHeader
+            title="Admin View Controls"
+            avatar={<SettingsIcon />}
+          />
+          <CardContent>
+            <Stack spacing={2}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={adminViewMode === 'ego'}
+                    onChange={(e) => setAdminViewMode(e.target.checked ? 'ego' : 'full')}
+                  />
+                }
+                label={adminViewMode === 'ego' ? 'Ego View (Your Perspective)' : 'Full Family View'}
+              />
+              {adminViewMode === 'full' && (
+                <FormControl fullWidth>
+                  <InputLabel id="viewer-select-label">Viewer Person</InputLabel>
+                  <Select
+                    labelId="viewer-select-label"
+                    id="viewer-select"
+                    value={viewerPersonId || ''}
+                    label="Viewer Person"
+                    onChange={(e) => setViewerPersonId(e.target.value)}
+                    disabled={loadingPersons || persons.length === 0}
+                  >
+                    {persons.map((person) => (
+                      <MenuItem key={person.id} value={person.id}>
+                        {person.first_name} {person.last_name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* View Mode Toggle */}
+      <Box display="flex" justifyContent="flex-end" mb={2}>
+        <ToggleButtonGroup
+          value={viewMode}
+          exclusive
+          onChange={(e, newMode) => {
+            if (newMode !== null) setViewMode(newMode);
+          }}
+          aria-label="view mode"
+        >
+          <ToggleButton value="list" aria-label="list view">
+            <ViewListIcon sx={{ mr: 1 }} />
+            List View
+          </ToggleButton>
+          <ToggleButton value="graph" aria-label="graph view">
+            <AccountTreeIcon sx={{ mr: 1 }} />
+            Graph View
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
 
       {/* Add Relationship Card */}
       <Card sx={{ mb: 3 }}>
@@ -449,6 +582,8 @@ const Topology = () => {
         persons={persons}
         topology={topology}
         viewerPersonId={viewerPersonId}
+        currentUserPersonId={currentUserPersonId}
+        isAdmin={isFamilyAdmin}
         onSuccess={async () => {
           // Refetch topology after successful relationship creation
           await fetchTopologyData();
@@ -464,23 +599,37 @@ const Topology = () => {
         />
         <Divider />
         <CardContent>
-          {loadingTopology ? (
+          {viewMode === 'graph' ? (
+            <Box sx={{ height: '600px', width: '100%' }}>
+              <FamilyGraph
+                topology={topology}
+                viewerPersonId={viewerPersonId}
+                currentUserPersonId={currentUserPersonId}
+              />
+            </Box>
+          ) : (
+            <>
+              {loadingTopology ? (
             <Box display="flex" justifyContent="center" p={4}>
               <CircularProgress />
             </Box>
           ) : topology?.nodes && topology.nodes.length > 0 ? (
-            <Grid container spacing={2}>
-              {topology.nodes.map((node) => {
+            (() => {
+              const grouped = groupNodesByCategory(topology.nodes);
+              
+              const renderNodeCard = (node) => {
                 const isViewer = node.id === viewerPersonId;
+                const isCurrentUser = node.id === currentUserPersonId;
                 const fullName = `${node.first_name || ''} ${node.last_name || ''}`.trim() || `Person ${node.id}`;
+                
                 return (
                   <Grid item xs={12} sm={6} md={4} key={node.id}>
                     <Card
                       variant="outlined"
                       sx={{
-                        border: isViewer ? 2 : 1,
-                        borderColor: isViewer ? 'primary.main' : 'divider',
-                        backgroundColor: isViewer ? 'action.selected' : 'background.paper',
+                        border: (isViewer || isCurrentUser) ? 2 : 1,
+                        borderColor: (isViewer || isCurrentUser) ? 'primary.main' : 'divider',
+                        backgroundColor: (isViewer || isCurrentUser) ? 'action.selected' : 'background.paper',
                         transition: 'all 0.2s',
                         '&:hover': {
                           boxShadow: 2,
@@ -492,7 +641,7 @@ const Topology = () => {
                         <Box display="flex" alignItems="center" gap={2} mb={2}>
                           <Avatar
                             sx={{
-                              bgcolor: isViewer ? 'primary.main' : 'secondary.main',
+                              bgcolor: (isViewer || isCurrentUser) ? 'primary.main' : 'secondary.main',
                               width: 56,
                               height: 56,
                             }}
@@ -503,13 +652,13 @@ const Topology = () => {
                             <Typography variant="h6" component="div">
                               {fullName}
                             </Typography>
-                            {isViewer && (
+                            {(isViewer || isCurrentUser) && (
                               <Chip label="You" size="small" color="primary" sx={{ mt: 0.5 }} />
                             )}
                           </Box>
                         </Box>
                         <Stack spacing={1}>
-                          {node.relation_to_viewer && !isViewer && (
+                          {node.relation_to_viewer && !isViewer && !isCurrentUser && (
                             <Chip
                               label={node.relation_to_viewer}
                               size="small"
@@ -538,8 +687,51 @@ const Topology = () => {
                     </Card>
                   </Grid>
                 );
-              })}
-            </Grid>
+              };
+
+              const renderCategory = (title, nodes, categoryKey, color = 'primary') => {
+                if (nodes.length === 0) return null;
+                
+                return (
+                  <Box sx={{ mb: 3 }} key={categoryKey}>
+                    <Box
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="space-between"
+                      sx={{
+                        mb: 2,
+                        cursor: 'pointer',
+                        p: 1,
+                        borderRadius: 1,
+                        '&:hover': { backgroundColor: 'action.hover' },
+                      }}
+                      onClick={() => setExpandedCategories(prev => ({
+                        ...prev,
+                        [categoryKey]: !prev[categoryKey],
+                      }))}
+                    >
+                      <Typography variant="subtitle1" fontWeight={600} color={`${color}.main`}>
+                        {title} ({nodes.length})
+                      </Typography>
+                      {expandedCategories[categoryKey] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    </Box>
+                    <Collapse in={expandedCategories[categoryKey]}>
+                      <Grid container spacing={2}>
+                        {nodes.map(renderNodeCard)}
+                      </Grid>
+                    </Collapse>
+                  </Box>
+                );
+              };
+
+              return (
+                <>
+                  {renderCategory('Immediate Family', grouped.immediate, 'immediate', 'primary')}
+                  {renderCategory('Extended Family', grouped.extended, 'extended', 'secondary')}
+                  {renderCategory('In-Laws', grouped.inlaws, 'inlaws', 'text')}
+                </>
+              );
+            })()
           ) : (
             <Box textAlign="center" py={4}>
               <PersonIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
@@ -547,6 +739,8 @@ const Topology = () => {
                 No persons yet.
               </Typography>
             </Box>
+          )}
+            </>
           )}
         </CardContent>
       </Card>
