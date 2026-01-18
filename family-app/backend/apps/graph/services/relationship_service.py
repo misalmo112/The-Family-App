@@ -116,10 +116,30 @@ def delete_relationship(relationship):
     Raises:
         ValidationError: If relationship doesn't exist or deletion fails
     """
+    import json
+    import os
+    DEBUG_LOG_PATH = r'c:\Users\misal\OneDrive\Belgeler\Projects\Github\The-Family-App\.cursor\debug.log'
+    def _log_debug(location, message, data, hypothesis_id):
+        try:
+            log_entry = {
+                'location': location,
+                'message': message,
+                'data': data,
+                'timestamp': __import__('time').time() * 1000,
+                'sessionId': 'debug-session',
+                'runId': 'run1',
+                'hypothesisId': hypothesis_id
+            }
+            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(log_entry) + '\n')
+        except:
+            pass
+    _log_debug('relationship_service.py:106', 'delete_relationship called', {'relationship_id': relationship.id, 'type': relationship.type, 'family_id': relationship.family.id}, 'E')
     deleted_relationships = []
     
     # For SPOUSE_OF, we need to delete both directions
     if relationship.type == RelationshipTypeChoices.SPOUSE_OF:
+        _log_debug('relationship_service.py:123', 'Deleting SPOUSE_OF relationship', {'relationship_id': relationship.id}, 'E')
         # Find both directions
         person_a = relationship.from_person
         person_b = relationship.to_person
@@ -140,17 +160,30 @@ def delete_relationship(relationship):
         ).first()
         
         # Delete both in a transaction
-        with transaction.atomic():
-            if relationship_ab:
-                deleted_relationships.append(relationship_ab)
-                relationship_ab.delete()
-            if relationship_ba and (not relationship_ab or relationship_ba.id != relationship_ab.id):
-                deleted_relationships.append(relationship_ba)
-                relationship_ba.delete()
+        try:
+            with transaction.atomic():
+                if relationship_ab:
+                    _log_debug('relationship_service.py:144', 'Deleting relationship_ab', {'relationship_id': relationship_ab.id}, 'E')
+                    deleted_relationships.append(relationship_ab)
+                    relationship_ab.delete()
+                if relationship_ba and (not relationship_ab or relationship_ba.id != relationship_ab.id):
+                    _log_debug('relationship_service.py:148', 'Deleting relationship_ba', {'relationship_id': relationship_ba.id}, 'E')
+                    deleted_relationships.append(relationship_ba)
+                    relationship_ba.delete()
+        except Exception as e:
+            _log_debug('relationship_service.py:151', 'Exception deleting SPOUSE_OF', {'error': str(e), 'error_type': type(e).__name__}, 'E')
+            raise
     else:
         # For PARENT_OF, just delete the single relationship
-        with transaction.atomic():
-            deleted_relationships.append(relationship)
-            relationship.delete()
+        _log_debug('relationship_service.py:154', 'Deleting PARENT_OF relationship', {'relationship_id': relationship.id}, 'E')
+        try:
+            with transaction.atomic():
+                deleted_relationships.append(relationship)
+                relationship.delete()
+                _log_debug('relationship_service.py:157', 'PARENT_OF deleted successfully', {'relationship_id': relationship.id}, 'E')
+        except Exception as e:
+            _log_debug('relationship_service.py:159', 'Exception deleting PARENT_OF', {'error': str(e), 'error_type': type(e).__name__}, 'E')
+            raise
     
+    _log_debug('relationship_service.py:162', 'delete_relationship completed', {'deleted_count': len(deleted_relationships)}, 'E')
     return deleted_relationships

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Topology Mockup</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-badge"></span>
+          Family Network
+        </div>
+        <nav class="nav">
+          <a href="index.html">Index</a>
+          <a href="feed.html">Feed</a>
+          <a href="profile.html">Profile</a>
+          <a href="onboarding.html">Onboarding</a>
+        </nav>
+      </header>
+
+      <section class="card hero" style="margin-top: 18px;">
+        <h1 class="title">Family Topology</h1>
+        <p class="subtle">
+          Visualize relationships and add new connections.
+        </p>
+        <div class="split" style="margin-top: 16px;">
+          <div class="stack">
+            <div class="section-title">Viewer</div>
+            <input class="input" value="Omar Abdallah" />
+            <div class="section-title">Add Relationship</div>
+            <input class="input" placeholder="From person" />
+            <input class="input" placeholder="To person" />
+            <div class="segmented">
+              <button class="seg active">Parent</button>
+              <button class="seg">Spouse</button>
+            </div>
+            <button class="btn primary">Add relation</button>
+          </div>
+          <div class="stack">
+            <div class="section-title">Nodes</div>
+            <div class="post-card">
+              <div class="post-title">Omar Abdallah</div>
+              <div class="meta">Self</div>
+            </div>
+            <div class="post-card">
+              <div class="post-title">Farah Abdallah</div>
+              <div class="meta">Sister</div>
+            </div>
+            <div class="post-card">
+              <div class="post-title">Maya Abdallah</div>
+              <div class="meta">Daughter</div>
+            </div>
+          </div>
+        </div>
+        <div class="section-title" style="margin-top: 18px;">Edges</div>
+        <div class="stack">
+          <div class="muted-block">Omar -> Maya (PARENT_OF)</div>
+          <div class="muted-block">Amina -> Omar (PARENT_OF)</div>
+          <div class="muted-block">Omar <-> Leila (SPOUSE_OF)</div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

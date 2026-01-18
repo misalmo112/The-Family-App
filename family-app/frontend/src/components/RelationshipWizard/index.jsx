@@ -23,8 +23,9 @@ import {
 import StepSelectPerson from './StepSelectPerson';
 import StepSelectLabel from './StepSelectLabel';
 import StepReview from './StepReview';
+import RelationshipSuggestions from '../RelationshipSuggestions';
 import { translateLabel, validateRelationship } from '../../services/relationshipTranslator';
-import { createRelationship } from '../../services/graph';
+import { createRelationship, getRelationshipSuggestions } from '../../services/graph';
 
 // Step labels - will be adjusted based on admin status
 const getSteps = (isAdmin) => {
@@ -68,6 +69,9 @@ const RelationshipWizard = ({
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [disabledLabels, setDisabledLabels] = useState([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [lastCreatedRelationship, setLastCreatedRelationship] = useState(null);
 
   // Get steps based on admin status
   const steps = getSteps(isAdmin);
@@ -92,6 +96,9 @@ const RelationshipWizard = ({
       setSearchTerm2('');
       setError(null);
       setDisabledLabels([]);
+      setSuggestionsOpen(false);
+      setSuggestions([]);
+      setLastCreatedRelationship(null);
     }
   }, [open, viewerPersonId, persons, isAdmin, currentUserPersonId]);
 
@@ -205,6 +212,7 @@ const RelationshipWizard = ({
 
     try {
       // Create each edge sequentially
+      let lastEdge = null;
       for (const edge of translation.edges) {
         await createRelationship({
           familyId,
@@ -212,9 +220,41 @@ const RelationshipWizard = ({
           toPersonId: edge.to,
           type: edge.type,
         });
+        lastEdge = edge;
       }
 
-      // Success
+      // Store last created relationship for suggestions
+      if (lastEdge) {
+        setLastCreatedRelationship({
+          fromPersonId: lastEdge.from,
+          toPersonId: lastEdge.to,
+          type: lastEdge.type,
+        });
+      }
+
+      // Fetch suggestions for the last created relationship
+      if (lastEdge) {
+        try {
+          const fetchedSuggestions = await getRelationshipSuggestions({
+            familyId,
+            fromPersonId: lastEdge.from,
+            toPersonId: lastEdge.to,
+            type: lastEdge.type,
+          });
+          
+          if (fetchedSuggestions && fetchedSuggestions.length > 0) {
+            setSuggestions(fetchedSuggestions);
+            setSuggestionsOpen(true);
+            // Don't close wizard yet - wait for user to handle suggestions
+            return;
+          }
+        } catch (suggestionErr) {
+          console.error('Error fetching suggestions:', suggestionErr);
+          // Continue with normal flow if suggestions fail
+        }
+      }
+
+      // Success - no suggestions or suggestions failed
       if (onSuccess) {
         onSuccess();
       }
@@ -236,14 +276,35 @@ const RelationshipWizard = ({
   };
 
   const handleClose = () => {
-    if (!submitting) {
+    if (!submitting && !suggestionsOpen) {
       setActiveStep(0);
       setSelectedPersonId(null);
       setSelectedLabel(null);
       setTargetPersonId(null);
       setError(null);
+      setSuggestionsOpen(false);
+      setSuggestions([]);
+      setLastCreatedRelationship(null);
       onClose();
     }
+  };
+
+  const handleSuggestionsClose = () => {
+    setSuggestionsOpen(false);
+    setSuggestions([]);
+    if (onSuccess) {
+      onSuccess();
+    }
+    handleClose();
+  };
+
+  const handleSuggestionsSuccess = () => {
+    setSuggestionsOpen(false);
+    setSuggestions([]);
+    if (onSuccess) {
+      onSuccess();
+    }
+    handleClose();
   };
 
   const renderStepContent = () => {
@@ -395,6 +456,16 @@ const RelationshipWizard = ({
             : 'Next'}
         </Button>
       </DialogActions>
+
+      {/* Relationship Suggestions Dialog */}
+      <RelationshipSuggestions
+        open={suggestionsOpen}
+        onClose={handleSuggestionsClose}
+        familyId={familyId}
+        suggestions={suggestions}
+        persons={persons}
+        onSuccess={handleSuggestionsSuccess}
+      />
     </Dialog>
   );
 };

@@ -13,6 +13,7 @@ import {
   ListItem,
   ListItemText,
   ListItemAvatar,
+  ListItemSecondaryAction,
   Avatar,
   Chip,
   Alert,
@@ -57,10 +58,12 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useFamily } from '../context/FamilyContext';
-import { getPersons, getTopology, createRelationship, createPerson, getCurrentUserPersonId, getRelationships, deleteRelationship } from '../services/graph';
+import { getPersons, getTopology, createRelationship, createPerson, getCurrentUserPersonId, getRelationships, deleteRelationship, getRelationshipCompletion } from '../services/graph';
 import { checkIsFamilyAdmin } from '../services/families';
 import RelationshipWizard from '../components/RelationshipWizard';
 import FamilyGraph from '../components/FamilyGraph';
+import BulkFamilyUnit from '../components/BulkFamilyUnit';
+import RelationshipTypeSelector from '../components/RelationshipTypeSelector';
 
 const Topology = () => {
   // Always call hook unconditionally - assumes FamilyProvider exists
@@ -95,7 +98,7 @@ const Topology = () => {
   // Ego view state
   const [isFamilyAdmin, setIsFamilyAdmin] = useState(false);
   const [currentUserPersonId, setCurrentUserPersonId] = useState(null);
-  const [adminViewMode, setAdminViewMode] = useState('ego'); // 'ego' or 'full'
+  const [viewModeToggle, setViewModeToggle] = useState('ego'); // 'ego' or 'full'
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'graph'
   const [loadingUserData, setLoadingUserData] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState({
@@ -115,6 +118,7 @@ const Topology = () => {
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
   const [showAdvancedMode, setShowAdvancedMode] = useState(false);
+  const [bulkFamilyUnitOpen, setBulkFamilyUnitOpen] = useState(false);
   
   // Create Person form state
   const [personFirstName, setPersonFirstName] = useState('');
@@ -132,6 +136,17 @@ const Topology = () => {
   const [relationshipToDelete, setRelationshipToDelete] = useState(null);
   const [deletingRelationship, setDeletingRelationship] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  
+  // Completion suggestions state
+  const [completionSuggestions, setCompletionSuggestions] = useState([]);
+  const [loadingCompletion, setLoadingCompletion] = useState(false);
+  const [completionPanelOpen, setCompletionPanelOpen] = useState(false);
+  
+  // Visual builder state
+  const [edgeCreationMode, setEdgeCreationMode] = useState(false);
+  const [typeSelectorOpen, setTypeSelectorOpen] = useState(false);
+  const [edgeFromPerson, setEdgeFromPerson] = useState(null);
+  const [edgeToPerson, setEdgeToPerson] = useState(null);
 
   // Fetch user data (person ID and admin status) when activeFamilyId changes
   useEffect(() => {
@@ -160,15 +175,13 @@ const Topology = () => {
     fetchUserData();
   }, [activeFamilyId]);
 
-  // Auto-set viewerPersonId for regular users (ego view)
+  // Auto-set viewerPersonId for ego view
   useEffect(() => {
-    if (currentUserPersonId && !isFamilyAdmin) {
-      setViewerPersonId(currentUserPersonId);
-    } else if (currentUserPersonId && isFamilyAdmin && adminViewMode === 'ego') {
-      // Admin in ego mode: use current user
+    if (currentUserPersonId && viewModeToggle === 'ego') {
+      // In ego mode: use current user
       setViewerPersonId(currentUserPersonId);
     }
-  }, [currentUserPersonId, isFamilyAdmin, adminViewMode]);
+  }, [currentUserPersonId, viewModeToggle]);
 
   // Fetch persons when activeFamilyId changes
   useEffect(() => {
@@ -186,8 +199,8 @@ const Topology = () => {
         const data = await getPersons({ familyId: activeFamilyId });
         setPersons(data || []);
         
-        // For admins in full view mode, default to first person if viewer not set
-        if (data && data.length > 0 && isFamilyAdmin && adminViewMode === 'full' && !viewerPersonId) {
+        // For full view mode, default to first person if viewer not set
+        if (data && data.length > 0 && viewModeToggle === 'full' && !viewerPersonId) {
           setViewerPersonId(data[0].id);
         }
       } catch (err) {
@@ -209,7 +222,7 @@ const Topology = () => {
     };
 
     fetchPersons();
-  }, [activeFamilyId, isFamilyAdmin, adminViewMode]);
+  }, [activeFamilyId, viewModeToggle]);
 
   // Function to fetch topology (reusable for refetching)
   const fetchTopologyData = useCallback(async () => {
@@ -500,19 +513,31 @@ const Topology = () => {
 
   // Handle delete relationship
   const handleDeleteClick = (relationship) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:514',message:'handleDeleteClick called',data:{relationship:relationship?{id:relationship.id,type:relationship.type,fromPersonId:relationship.from_person_id,toPersonId:relationship.to_person_id,hasId:!!relationship.id}:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     setRelationshipToDelete(relationship);
     setDeleteDialogOpen(true);
     setDeleteError(null);
   };
 
   const handleDeleteConfirm = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:520',message:'handleDeleteConfirm called',data:{relationshipToDelete:relationshipToDelete?{id:relationshipToDelete.id,type:relationshipToDelete.type}:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
     if (!relationshipToDelete) return;
 
     try {
       setDeletingRelationship(true);
       setDeleteError(null);
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:527',message:'Calling deleteRelationship',data:{relationshipId:relationshipToDelete.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       await deleteRelationship(relationshipToDelete.id);
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:528',message:'deleteRelationship success',data:{relationshipId:relationshipToDelete.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
 
       // Close dialog
       setDeleteDialogOpen(false);
@@ -525,6 +550,9 @@ const Topology = () => {
       // Refetch topology to reflect changes
       await fetchTopologyData();
     } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:539',message:'deleteRelationship error',data:{error:err.message,status:err.response?.status,responseData:err.response?.data,relationshipId:relationshipToDelete?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       console.error('Error deleting relationship:', err);
       if (err.response) {
         if (err.response.status === 403) {
@@ -574,47 +602,45 @@ const Topology = () => {
         </Alert>
       )}
 
-      {/* Admin Controls */}
-      {isFamilyAdmin && (
-        <Card sx={{ mb: 3 }}>
-          <CardHeader
-            title="Admin View Controls"
-            avatar={<SettingsIcon />}
-          />
-          <CardContent>
-            <Stack spacing={2}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={adminViewMode === 'ego'}
-                    onChange={(e) => setAdminViewMode(e.target.checked ? 'ego' : 'full')}
-                  />
-                }
-                label={adminViewMode === 'ego' ? 'Ego View (Your Perspective)' : 'Full Family View'}
-              />
-              {adminViewMode === 'full' && (
-                <FormControl fullWidth>
-                  <InputLabel id="viewer-select-label">Viewer Person</InputLabel>
-                  <Select
-                    labelId="viewer-select-label"
-                    id="viewer-select"
-                    value={viewerPersonId || ''}
-                    label="Viewer Person"
-                    onChange={(e) => setViewerPersonId(e.target.value)}
-                    disabled={loadingPersons || persons.length === 0}
-                  >
-                    {persons.map((person) => (
-                      <MenuItem key={person.id} value={person.id}>
-                        {person.first_name} {person.last_name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )}
-            </Stack>
-          </CardContent>
-        </Card>
-      )}
+      {/* View Controls - Available to Everyone */}
+      <Card sx={{ mb: 3 }}>
+        <CardHeader
+          title="View Controls"
+          avatar={<SettingsIcon />}
+        />
+        <CardContent>
+          <Stack spacing={2}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={viewModeToggle === 'ego'}
+                  onChange={(e) => setViewModeToggle(e.target.checked ? 'ego' : 'full')}
+                />
+              }
+              label={viewModeToggle === 'ego' ? 'Ego View (Your Perspective)' : 'Full Family View'}
+            />
+            {viewModeToggle === 'full' && (
+              <FormControl fullWidth>
+                <InputLabel id="viewer-select-label">Viewer Person</InputLabel>
+                <Select
+                  labelId="viewer-select-label"
+                  id="viewer-select"
+                  value={viewerPersonId || ''}
+                  label="Viewer Person"
+                  onChange={(e) => setViewerPersonId(e.target.value)}
+                  disabled={loadingPersons || persons.length === 0}
+                >
+                  {persons.map((person) => (
+                    <MenuItem key={person.id} value={person.id}>
+                      {person.first_name} {person.last_name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
 
       {/* View Mode Toggle */}
       <Box display="flex" justifyContent="flex-end" mb={2}>
@@ -622,7 +648,13 @@ const Topology = () => {
           value={viewMode}
           exclusive
           onChange={(e, newMode) => {
-            if (newMode !== null) setViewMode(newMode);
+            if (newMode !== null) {
+              setViewMode(newMode);
+              // Disable edge creation mode when switching away from graph
+              if (newMode !== 'graph') {
+                setEdgeCreationMode(false);
+              }
+            }
           }}
           aria-label="view mode"
         >
@@ -635,6 +667,18 @@ const Topology = () => {
             Graph View
           </ToggleButton>
         </ToggleButtonGroup>
+        {viewMode === 'graph' && isFamilyAdmin && (
+          <FormControlLabel
+            control={
+              <Switch
+                checked={edgeCreationMode}
+                onChange={(e) => setEdgeCreationMode(e.target.checked)}
+                color="primary"
+              />
+            }
+            label="Enable Relationship Builder"
+          />
+        )}
       </Box>
 
       {/* Add Person Card - Admin Only */}
@@ -739,6 +783,37 @@ const Topology = () => {
                 {creatingPerson ? 'Creating...' : 'Create Person'}
               </Button>
             </Stack>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Create Family Unit Card */}
+      {isFamilyAdmin && (
+        <Card sx={{ mb: 3 }}>
+          <CardHeader
+            title="Create Family Unit"
+            subheader="Create an entire family unit (parents + children) in one operation"
+            avatar={<FamilyRestroomIcon />}
+          />
+          <CardContent>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Quickly create a family unit by selecting parents and children. All relationships will be created automatically.
+            </Alert>
+            <Button
+              variant="contained"
+              size="large"
+              fullWidth
+              startIcon={<FamilyRestroomIcon />}
+              onClick={() => setBulkFamilyUnitOpen(true)}
+              disabled={persons.length < 2}
+            >
+              Create Family Unit
+            </Button>
+            {persons.length < 2 && (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                You need at least 2 people in the family to create a family unit.
+              </Typography>
+            )}
           </CardContent>
         </Card>
       )}
@@ -900,6 +975,189 @@ const Topology = () => {
         }}
       />
 
+      {/* Bulk Family Unit Dialog */}
+      <BulkFamilyUnit
+        open={bulkFamilyUnitOpen}
+        onClose={() => setBulkFamilyUnitOpen(false)}
+        familyId={activeFamilyId}
+        persons={persons}
+        onSuccess={async () => {
+          // Refetch topology after successful family unit creation
+          await fetchTopologyData();
+          // Refetch relationships list
+          const updatedRelationships = await getRelationships({ familyId: activeFamilyId });
+          setRelationships(updatedRelationships || []);
+        }}
+      />
+
+      {/* Relationship Type Selector Dialog */}
+      <RelationshipTypeSelector
+        open={typeSelectorOpen}
+        onClose={() => {
+          setTypeSelectorOpen(false);
+          setEdgeFromPerson(null);
+          setEdgeToPerson(null);
+        }}
+        fromPerson={edgeFromPerson}
+        toPerson={edgeToPerson}
+        onConfirm={async (relationshipData) => {
+          try {
+            await createRelationship({
+              familyId: activeFamilyId,
+              fromPersonId: relationshipData.fromPersonId,
+              toPersonId: relationshipData.toPersonId,
+              type: relationshipData.type,
+            });
+            // Refetch topology after successful relationship creation
+            await fetchTopologyData();
+            // Refetch relationships list
+            const updatedRelationships = await getRelationships({ familyId: activeFamilyId });
+            setRelationships(updatedRelationships || []);
+            setTypeSelectorOpen(false);
+            setEdgeFromPerson(null);
+            setEdgeToPerson(null);
+          } catch (err) {
+            console.error('Error creating relationship:', err);
+            // Error will be shown in the dialog or we could add error state
+          }
+        }}
+      />
+
+      {/* Relationship Completion Suggestions Card */}
+      {isFamilyAdmin && (
+        <Card sx={{ mb: 3 }}>
+          <CardHeader
+            title="Relationship Suggestions"
+            subheader="Find and add missing relationships"
+            avatar={<AutoAwesomeIcon />}
+            action={
+              <IconButton
+                onClick={() => setCompletionPanelOpen(!completionPanelOpen)}
+                aria-label="toggle completion panel"
+              >
+                {completionPanelOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </IconButton>
+            }
+          />
+          <Collapse in={completionPanelOpen}>
+            <Divider />
+            <CardContent>
+              <Box sx={{ mb: 2 }}>
+                <Button
+                  variant="outlined"
+                  onClick={async () => {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:1032',message:'Analyze button clicked',data:{activeFamilyId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                    // #endregion
+                    if (!activeFamilyId) return;
+                    setLoadingCompletion(true);
+                    try {
+                      // #region agent log
+                      fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:1036',message:'Calling getRelationshipCompletion',data:{familyId:activeFamilyId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                      // #endregion
+                      const suggestions = await getRelationshipCompletion({ familyId: activeFamilyId });
+                      // #region agent log
+                      fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:1037',message:'getRelationshipCompletion success',data:{suggestionsCount:suggestions?.length||0,suggestions},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                      // #endregion
+                      setCompletionSuggestions(suggestions || []);
+                    } catch (err) {
+                      // #region agent log
+                      fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:1039',message:'getRelationshipCompletion error',data:{error:err.message,errorStack:err.stack,response:err.response?.data,status:err.response?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                      // #endregion
+                      console.error('Error fetching completion suggestions:', err);
+                      setCompletionSuggestions([]);
+                    } finally {
+                      setLoadingCompletion(false);
+                    }
+                  }}
+                  disabled={loadingCompletion || !activeFamilyId}
+                  startIcon={loadingCompletion ? <CircularProgress size={16} /> : <AutoAwesomeIcon />}
+                >
+                  {loadingCompletion ? 'Analyzing...' : 'Analyze Missing Relationships'}
+                </Button>
+              </Box>
+
+              {completionSuggestions.length > 0 ? (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Found {completionSuggestions.length} suggestion(s):
+                  </Typography>
+                  <List dense>
+                    {completionSuggestions.map((suggestion, index) => {
+                      const fromPerson = persons.find(p => p.id === suggestion.from_person_id);
+                      const toPerson = persons.find(p => p.id === suggestion.to_person_id);
+                      const getPersonName = (person) => {
+                        if (!person) return `Person ${suggestion.from_person_id || suggestion.to_person_id}`;
+                        return `${person.first_name || ''} ${person.last_name || ''}`.trim() || `Person ${person.id}`;
+                      };
+                      return (
+                        <ListItem key={index}>
+                          <ListItemText
+                            primary={
+                              <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                                <Typography variant="body2">
+                                  {getPersonName(fromPerson)}
+                                </Typography>
+                                <ArrowForwardIcon fontSize="small" />
+                                <Typography variant="body2">
+                                  {getPersonName(toPerson)}
+                                </Typography>
+                                <Chip
+                                  label={suggestion.relationship_type.replace('_', ' ')}
+                                  size="small"
+                                  color="primary"
+                                />
+                              </Box>
+                            }
+                            secondary={
+                              <Typography variant="body2" color="text.secondary">
+                                {suggestion.reason}
+                              </Typography>
+                            }
+                          />
+                          <ListItemSecondaryAction>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={async () => {
+                                try {
+                                  await createRelationship({
+                                    familyId: activeFamilyId,
+                                    fromPersonId: suggestion.from_person_id,
+                                    toPersonId: suggestion.to_person_id,
+                                    type: suggestion.relationship_type,
+                                  });
+                                  // Remove from suggestions list
+                                  setCompletionSuggestions(prev => prev.filter((_, i) => i !== index));
+                                  // Refresh topology
+                                  await fetchTopologyData();
+                                } catch (err) {
+                                  console.error('Error creating suggested relationship:', err);
+                                }
+                              }}
+                            >
+                              Add
+                            </Button>
+                          </ListItemSecondaryAction>
+                        </ListItem>
+                      );
+                    })}
+                  </List>
+                </Box>
+              ) : loadingCompletion ? (
+                <Box display="flex" justifyContent="center" p={2}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : (
+                <Alert severity="info">
+                  Click "Analyze Missing Relationships" to find relationship suggestions.
+                </Alert>
+              )}
+            </CardContent>
+          </Collapse>
+        </Card>
+      )}
+
       {/* Manage Relationships Card - Admin Only */}
       {isFamilyAdmin && (
         <Card sx={{ mb: 3 }}>
@@ -1038,11 +1296,17 @@ const Topology = () => {
         <Divider />
         <CardContent>
           {viewMode === 'graph' ? (
-            <Box sx={{ height: '600px', width: '100%' }}>
+            <Box sx={{ height: '600px', width: '100%', position: 'relative' }}>
               <FamilyGraph
                 topology={topology}
                 viewerPersonId={viewerPersonId}
                 currentUserPersonId={currentUserPersonId}
+                edgeCreationMode={edgeCreationMode}
+                onEdgeCreate={(fromPerson, toPerson) => {
+                  setEdgeFromPerson(fromPerson);
+                  setEdgeToPerson(toPerson);
+                  setTypeSelectorOpen(true);
+                }}
               />
             </Box>
           ) : (

@@ -6,8 +6,11 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
 from apps.graph.models import Person, Relationship, RelationshipTypeChoices
-from apps.graph.serializers import PersonSerializer, RelationshipSerializer
+from apps.graph.serializers import PersonSerializer, RelationshipSerializer, RelationshipSuggestionSerializer, BulkFamilyUnitSerializer
 from apps.graph.services.relationship_service import add_parent, add_spouse, delete_relationship
+from apps.graph.services.relationship_suggestions import get_related_suggestions
+from apps.graph.services.relationship_completion import analyze_missing_relationships
+from apps.graph.services.bulk_relationship_service import create_family_unit
 
 
 def is_family_admin(user, family):
@@ -175,9 +178,31 @@ class RelationshipView(APIView):
 
     def delete(self, request, pk=None):
         """Delete a relationship (ADMIN of family only)"""
+        import json
+        import os
+        import traceback
+        DEBUG_LOG_PATH = r'c:\Users\misal\OneDrive\Belgeler\Projects\Github\The-Family-App\.cursor\debug.log'
+        def _log_debug(location, message, data, hypothesis_id):
+            try:
+                log_entry = {
+                    'location': location,
+                    'message': message,
+                    'data': data,
+                    'timestamp': __import__('time').time() * 1000,
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': hypothesis_id
+                }
+                with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(log_entry) + '\n')
+            except:
+                pass
+        _log_debug('views.py:179', 'Delete endpoint called', {'pk': pk, 'has_pk': pk is not None}, 'D')
         # Get relationship ID from URL parameter or request body
         relationship_id = pk or request.data.get('id')
+        _log_debug('views.py:183', 'Relationship ID extracted', {'relationship_id': relationship_id, 'from_pk': pk is not None}, 'D')
         if not relationship_id:
+            _log_debug('views.py:185', 'Missing relationship ID', {}, 'D')
             return Response(
                 {'error': 'Relationship ID is required'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -186,14 +211,18 @@ class RelationshipView(APIView):
         # Get relationship
         try:
             relationship = get_object_or_404(Relationship, id=relationship_id)
-        except:
+            _log_debug('views.py:192', 'Relationship found', {'relationship_id': relationship.id, 'type': relationship.type, 'family_id': relationship.family.id}, 'D')
+        except Exception as e:
+            _log_debug('views.py:195', 'Relationship not found', {'relationship_id': relationship_id, 'error': str(e)}, 'D')
             return Response(
                 {'error': 'Relationship not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
         # Check if user is ADMIN of that family
-        if not is_family_admin(request.user, relationship.family):
+        is_admin = is_family_admin(request.user, relationship.family)
+        _log_debug('views.py:200', 'Admin check', {'is_admin': is_admin, 'user': request.user.username, 'family_id': relationship.family.id}, 'D')
+        if not is_admin:
             return Response(
                 {'error': 'Only family admins can delete relationships'},
                 status=status.HTTP_403_FORBIDDEN
@@ -201,7 +230,9 @@ class RelationshipView(APIView):
 
         # Delete the relationship(s)
         try:
+            _log_debug('views.py:207', 'Calling delete_relationship service', {'relationship_id': relationship.id, 'type': relationship.type}, 'D')
             deleted_relationships = delete_relationship(relationship)
+            _log_debug('views.py:208', 'delete_relationship service success', {'deleted_count': len(deleted_relationships)}, 'D')
             
             # Optional: Create audit log entry
             try:
@@ -223,11 +254,19 @@ class RelationshipView(APIView):
                 # Audit service not available, continue without logging
                 pass
             
+            _log_debug('views.py:229', 'Returning success response', {'status': 204}, 'D')
             return Response(status=status.HTTP_204_NO_CONTENT)
         except ValidationError as e:
+            _log_debug('views.py:231', 'ValidationError in delete', {'error': str(e), 'error_type': type(e).__name__}, 'D')
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            _log_debug('views.py:236', 'Unexpected exception in delete', {'error': str(e), 'error_type': type(e).__name__, 'traceback': traceback.format_exc()}, 'D')
+            return Response(
+                {'error': f'Error deleting relationship: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
@@ -299,3 +338,186 @@ class TopologyView(APIView):
         from apps.graph.serializers import TopologyResponseSerializer
         serializer = TopologyResponseSerializer(topology_data)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class RelationshipSuggestionsView(APIView):
+    """Get relationship suggestions after creating a relationship"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get suggestions for a newly created relationship"""
+        family_id = request.query_params.get('family_id')
+        from_person_id = request.query_params.get('from_person_id')
+        to_person_id = request.query_params.get('to_person_id')
+        relationship_type = request.query_params.get('relationship_type')
+        
+        # Validate required parameters
+        if not all([family_id, from_person_id, to_person_id, relationship_type]):
+            return Response(
+                {'error': 'family_id, from_person_id, to_person_id, and relationship_type are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Convert to integers
+        try:
+            family_id = int(family_id)
+            from_person_id = int(from_person_id)
+            to_person_id = int(to_person_id)
+        except ValueError:
+            return Response(
+                {'error': 'family_id, from_person_id, and to_person_id must be valid integers'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate relationship type
+        if relationship_type not in [RelationshipTypeChoices.PARENT_OF, RelationshipTypeChoices.SPOUSE_OF]:
+            return Response(
+                {'error': 'relationship_type must be PARENT_OF or SPOUSE_OF'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get family object
+        try:
+            from apps.families.models import Family
+            family = get_object_or_404(Family, id=family_id)
+        except:
+            return Response(
+                {'error': 'Family not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if user is a member of that family
+        if not is_family_member(request.user, family):
+            return Response(
+                {'error': 'You must be a member of this family to view suggestions'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get suggestions
+        try:
+            suggestions = get_related_suggestions(family_id, from_person_id, to_person_id, relationship_type)
+            serializer = RelationshipSuggestionSerializer(suggestions, many=True)
+            return Response({'suggestions': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': f'Error generating suggestions: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class RelationshipCompletionView(APIView):
+    """Get missing relationship suggestions for a family"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get suggestions for missing relationships"""
+        family_id = request.query_params.get('family_id')
+        person_id = request.query_params.get('person_id')  # Optional
+        
+        # Validate required parameters
+        if not family_id:
+            return Response(
+                {'error': 'family_id query parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Convert to integers
+        try:
+            family_id = int(family_id)
+            if person_id:
+                person_id = int(person_id)
+        except ValueError:
+            return Response(
+                {'error': 'family_id and person_id must be valid integers'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get family object
+        try:
+            from apps.families.models import Family
+            family = get_object_or_404(Family, id=family_id)
+        except:
+            return Response(
+                {'error': 'Family not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if user is a member of that family
+        if not is_family_member(request.user, family):
+            return Response(
+                {'error': 'You must be a member of this family to view completion suggestions'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get suggestions
+        try:
+            import json
+            import os
+            DEBUG_LOG_PATH = r'c:\Users\misal\OneDrive\Belgeler\Projects\Github\The-Family-App\.cursor\debug.log'
+            def _log_debug(location, message, data, hypothesis_id):
+                try:
+                    log_entry = {
+                        'location': location,
+                        'message': message,
+                        'data': data,
+                        'timestamp': __import__('time').time() * 1000,
+                        'sessionId': 'debug-session',
+                        'runId': 'run1',
+                        'hypothesisId': hypothesis_id
+                    }
+                    with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
+                        f.write(json.dumps(log_entry) + '\n')
+                except:
+                    pass
+            _log_debug('views.py:418', 'Calling analyze_missing_relationships', {'family_id': family_id, 'person_id': person_id}, 'D')
+            suggestions = analyze_missing_relationships(family_id, person_id)
+            _log_debug('views.py:420', 'Got suggestions from service', {'suggestion_count': len(suggestions)}, 'D')
+            serializer = RelationshipSuggestionSerializer(suggestions, many=True)
+            _log_debug('views.py:421', 'Serialized suggestions', {'serialized_count': len(serializer.data)}, 'D')
+            return Response({'suggestions': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            import traceback
+            _log_debug('views.py:425', 'Exception in completion view', {'error': str(e), 'error_type': type(e).__name__, 'traceback': traceback.format_exc()}, 'D')
+            return Response(
+                {'error': f'Error analyzing relationships: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class BulkFamilyUnitView(APIView):
+    """Create a family unit (parents + children) in one operation"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Create a family unit with parents and children"""
+        serializer = BulkFamilyUnitSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        from apps.families.models import Family
+        family = get_object_or_404(Family, id=serializer.validated_data['family_id'])
+        if not is_family_admin(request.user, family):
+            return Response(
+                {'error': 'Only family admins can create family units'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        result = create_family_unit(
+            family,
+            serializer.validated_data.get('parent1_id'),
+            serializer.validated_data.get('parent2_id'),
+            serializer.validated_data['children_ids']
+        )
+        
+        if result['success']:
+            return Response({
+                'created_count': len(result['created']),
+                'relationships': RelationshipSerializer(result['created'], many=True).data
+            }, status=status.HTTP_201_CREATED)
+        else:
+            # Partial success - some relationships created, some failed
+            return Response({
+                'created_count': len(result['created']),
+                'errors': result['errors'],
+                'relationships': RelationshipSerializer(result['created'], many=True).data
+            }, status=status.HTTP_207_MULTI_STATUS)

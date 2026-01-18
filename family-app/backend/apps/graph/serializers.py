@@ -122,6 +122,32 @@ class EdgeSerializer(serializers.Serializer):
         return ret
 
 
+class RelationshipSuggestionSerializer(serializers.Serializer):
+    """Serializer for relationship suggestions"""
+    type = serializers.CharField()
+    from_person_id = serializers.IntegerField()
+    to_person_id = serializers.IntegerField()
+    relationship_type = serializers.CharField()
+    reason = serializers.CharField()
+    confidence = serializers.ChoiceField(choices=['high', 'medium', 'low'])
+
+
+class BulkFamilyUnitSerializer(serializers.Serializer):
+    """Serializer for bulk family unit creation"""
+    family_id = serializers.IntegerField()
+    parent1_id = serializers.IntegerField(required=False, allow_null=True)
+    parent2_id = serializers.IntegerField(required=False, allow_null=True)
+    children_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        min_length=1
+    )
+    
+    def validate(self, attrs):
+        if not attrs.get('parent1_id') and not attrs.get('parent2_id'):
+            raise serializers.ValidationError('At least one parent is required')
+        return attrs
+
+
 class TopologyResponseSerializer(serializers.Serializer):
     """Serializer for topology response"""
     family_id = serializers.IntegerField()

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Topology Relationship Wizard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-badge"></span>
+          Family Network
+        </div>
+        <nav class="nav">
+          <a href="index.html">Index</a>
+          <a href="feed.html">Feed</a>
+          <a href="profile.html">Profile</a>
+          <a href="onboarding.html">Onboarding</a>
+        </nav>
+      </header>
+
+      <section class="card hero" style="margin-top: 18px;">
+        <div class="post-header">
+          <div>
+            <div class="post-title">Relationship Wizard</div>
+            <div class="meta">Human-friendly relationship mapping</div>
+          </div>
+          <span class="badge">Admin</span>
+        </div>
+
+        <div class="split" style="margin-top: 16px;">
+          <div class="stack">
+            <div class="section-title">Step 1: Select people</div>
+            <input class="input" placeholder="Viewer / reference person" />
+            <input class="input" placeholder="Target person" />
+
+            <div class="section-title">Step 2: Choose relationship</div>
+            <div class="pill-row">
+              <span class="node-chip">Father</span>
+              <span class="node-chip">Mother</span>
+              <span class="node-chip">Spouse</span>
+              <span class="node-chip">Son</span>
+              <span class="node-chip">Daughter</span>
+              <span class="node-chip">Uncle</span>
+              <span class="node-chip">Aunt</span>
+              <span class="node-chip">Cousin</span>
+            </div>
+
+            <div class="section-title">Step 3: Confirm edges</div>
+            <div class="muted-block">
+              This will create:
+              <div class="meta">Amina -> Omar (PARENT_OF)</div>
+              <div class="meta">Omar -> Maya (PARENT_OF)</div>
+            </div>
+            <div class="toolbar">
+              <button class="btn ghost">Back</button>
+              <button class="btn primary">Create relationship</button>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="section-title">Preview</div>
+            <div class="graph-board">
+              <svg viewBox="0 0 640 360" aria-hidden="true">
+                <rect x="0" y="0" width="640" height="360" fill="rgba(255,255,255,0.35)" />
+                <line x1="200" y1="120" x2="320" y2="220" stroke="rgba(0,0,0,0.15)" stroke-width="2" />
+                <line x1="320" y1="220" x2="440" y2="120" stroke="rgba(0,0,0,0.15)" stroke-width="2" />
+                <rect x="140" y="90" rx="18" ry="18" width="120" height="60" fill="rgba(0,194,168,0.14)" stroke="rgba(0,194,168,0.4)" />
+                <text x="200" y="125" text-anchor="middle" font-size="12" fill="#1c1f2a" font-weight="700">Amina</text>
+                <rect x="260" y="200" rx="18" ry="18" width="120" height="60" fill="rgba(0,194,168,0.14)" stroke="rgba(0,194,168,0.4)" />
+                <text x="320" y="235" text-anchor="middle" font-size="12" fill="#1c1f2a" font-weight="700">Omar</text>
+                <rect x="380" y="90" rx="18" ry="18" width="120" height="60" fill="rgba(0,194,168,0.14)" stroke="rgba(0,194,168,0.4)" />
+                <text x="440" y="125" text-anchor="middle" font-size="12" fill="#1c1f2a" font-weight="700">Maya</text>
+              </svg>
+            </div>
+            <div class="section-title">Validation</div>
+            <div class="post-card">
+              <div class="meta">Max parents rule: OK</div>
+              <div class="meta">No cycle detected</div>
+              <div class="meta">Family membership verified</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

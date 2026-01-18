@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>User Profile Settings Mockup</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-badge"></span>
+          Family Network
+        </div>
+        <nav class="nav">
+          <a href="index.html">Index</a>
+          <a href="feed.html">Feed</a>
+          <a href="profile.html">Profile</a>
+          <a href="onboarding.html">Onboarding</a>
+          <a href="login.html">Login</a>
+          <a href="register.html">Register</a>
+        </nav>
+      </header>
+
+      <div class="split" style="margin-top: 18px;">
+        <section class="card hero">
+          <h1 class="title">Account Settings</h1>
+          <p class="subtle">Manage profile data used across families.</p>
+          <div class="form-grid" style="margin-top: 16px;">
+            <input class="input" placeholder="First name" value="Omar" />
+            <input class="input" placeholder="Last name" value="Abdallah" />
+            <input class="input" placeholder="Username" value="omar.a" />
+            <input class="input" placeholder="Email" value="omar@email.com" />
+            <input class="input" placeholder="Date of birth" value="1990-02-13" />
+            <input class="input" placeholder="Gender" value="Male" />
+          </div>
+          <div style="margin-top: 16px; display: flex; gap: 10px;">
+            <button class="btn ghost">Cancel</button>
+            <button class="btn primary">Save changes</button>
+          </div>
+        </section>
+
+        <section class="card hero">
+          <h1 class="title">Security</h1>
+          <p class="subtle">Update password and account access.</p>
+          <div class="stack" style="margin-top: 16px;">
+            <input class="input" placeholder="Current password" type="password" />
+            <input class="input" placeholder="New password" type="password" />
+            <input class="input" placeholder="Confirm new password" type="password" />
+            <button class="btn primary">Change password</button>
+          </div>
+          <div class="muted-block" style="margin-top: 16px;">
+            For account recovery, ensure your email is up to date.
+          </div>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,5 +1,5 @@
 from django.urls import path
-from apps.graph.views import PersonView, TopologyView, RelationshipView
+from apps.graph.views import PersonView, TopologyView, RelationshipView, RelationshipSuggestionsView, RelationshipCompletionView, BulkFamilyUnitView
 
 app_name = 'graph'
 
@@ -8,5 +8,8 @@ urlpatterns = [
     path('topology/', TopologyView.as_view(), name='topology'),
     path('relationships/', RelationshipView.as_view(), name='relationship-list-create'),
     path('relationships/<int:pk>/', RelationshipView.as_view(), name='relationship-delete'),
+    path('relationships/suggestions/', RelationshipSuggestionsView.as_view(), name='relationship-suggestions'),
+    path('relationships/completion/', RelationshipCompletionView.as_view(), name='relationship-completion'),
+    path('family-units/', BulkFamilyUnitView.as_view(), name='bulk-family-unit'),
 ]
 

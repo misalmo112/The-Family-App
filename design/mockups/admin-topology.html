@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin Topology Mockup</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-badge"></span>
+          Family Network
+        </div>
+        <nav class="nav">
+          <a href="index.html">Index</a>
+          <a href="feed.html">Feed</a>
+          <a href="profile.html">Profile</a>
+          <a href="onboarding.html">Onboarding</a>
+        </nav>
+      </header>
+
+      <section class="card hero" style="margin-top: 18px;">
+        <div class="post-header">
+          <div>
+            <div class="post-title">Admin Topology</div>
+            <div class="meta">Advanced controls for graph editing</div>
+          </div>
+          <span class="badge">Admin</span>
+        </div>
+
+        <div class="split" style="margin-top: 16px;">
+          <div class="stack">
+            <div class="section-title">Graph Controls</div>
+            <div class="panel-list">
+              <div class="post-card">
+                <div class="post-title">Viewer</div>
+                <input class="input" value="Omar Abdallah" />
+              </div>
+              <div class="post-card">
+                <div class="post-title">Add Person</div>
+                <div class="stack">
+                  <input class="input" placeholder="First name" />
+                  <input class="input" placeholder="Last name" />
+                  <button class="btn primary">Create person</button>
+                </div>
+              </div>
+              <div class="post-card">
+                <div class="post-title">Add Relationship</div>
+                <div class="stack">
+                  <input class="input" placeholder="From person" />
+                  <input class="input" placeholder="To person" />
+                  <div class="segmented">
+                    <button class="seg active">Parent</button>
+                    <button class="seg">Spouse</button>
+                  </div>
+                  <button class="btn primary">Add relation</button>
+                </div>
+              </div>
+              <div class="post-card">
+                <div class="post-title">Relation Templates</div>
+                <div class="stack">
+                  <div class="node-chip">Father</div>
+                  <div class="node-chip">Mother</div>
+                  <div class="node-chip">Uncle/Aunt</div>
+                  <div class="node-chip">Cousin</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="section-title">Family Graph View</div>
+            <div class="graph-board">
+              <svg viewBox="0 0 640 360" aria-hidden="true">
+                <defs>
+                  <linearGradient id="nodeGlow" x1="0" x2="1">
+                    <stop offset="0%" stop-color="#00c2a8" stop-opacity="0.25" />
+                    <stop offset="100%" stop-color="#7df0df" stop-opacity="0.15" />
+                  </linearGradient>
+                </defs>
+                <rect x="0" y="0" width="640" height="360" fill="rgba(255,255,255,0.35)" />
+                <line x1="140" y1="90" x2="320" y2="180" stroke="rgba(0,0,0,0.15)" stroke-width="2" />
+                <line x1="500" y1="90" x2="320" y2="180" stroke="rgba(0,0,0,0.15)" stroke-width="2" />
+                <line x1="320" y1="180" x2="320" y2="290" stroke="rgba(0,0,0,0.15)" stroke-width="2" />
+
+                <rect x="80" y="50" rx="18" ry="18" width="120" height="60" fill="url(#nodeGlow)" stroke="rgba(0,194,168,0.4)" />
+                <text x="140" y="85" text-anchor="middle" font-size="12" fill="#1c1f2a" font-weight="700">Amina</text>
+                <text x="140" y="102" text-anchor="middle" font-size="10" fill="#4a5166">Mother</text>
+
+                <rect x="440" y="50" rx="18" ry="18" width="120" height="60" fill="url(#nodeGlow)" stroke="rgba(0,194,168,0.4)" />
+                <text x="500" y="85" text-anchor="middle" font-size="12" fill="#1c1f2a" font-weight="700">Khaled</text>
+                <text x="500" y="102" text-anchor="middle" font-size="10" fill="#4a5166">Father</text>
+
+                <rect x="260" y="150" rx="18" ry="18" width="120" height="60" fill="url(#nodeGlow)" stroke="rgba(0,194,168,0.4)" />
+                <text x="320" y="185" text-anchor="middle" font-size="12" fill="#1c1f2a" font-weight="700">Omar</text>
+                <text x="320" y="202" text-anchor="middle" font-size="10" fill="#4a5166">Self</text>
+
+                <rect x="260" y="260" rx="18" ry="18" width="120" height="60" fill="url(#nodeGlow)" stroke="rgba(0,194,168,0.4)" />
+                <text x="320" y="295" text-anchor="middle" font-size="12" fill="#1c1f2a" font-weight="700">Maya</text>
+                <text x="320" y="312" text-anchor="middle" font-size="10" fill="#4a5166">Daughter</text>
+              </svg>
+            </div>
+            <div class="section-title">Edges</div>
+            <div class="panel-list">
+              <div class="muted-block">Amina -> Omar (PARENT_OF)</div>
+              <div class="muted-block">Khaled -> Omar (PARENT_OF)</div>
+              <div class="muted-block">Omar -> Maya (PARENT_OF)</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -78,9 +78,17 @@ const nodeTypes = {
  * Family Graph Component
  * Displays family relationships as a visual graph using React Flow
  */
-const FamilyGraph = ({ topology, viewerPersonId, currentUserPersonId }) => {
+const FamilyGraph = ({ 
+  topology, 
+  viewerPersonId, 
+  currentUserPersonId,
+  edgeCreationMode = false,
+  onEdgeCreate,
+}) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [draggingFrom, setDraggingFrom] = useState(null);
+  const [previewEdge, setPreviewEdge] = useState(null);
 
   // Build person map
   const personMap = useMemo(() => {
@@ -240,6 +248,50 @@ const FamilyGraph = ({ topology, viewerPersonId, currentUserPersonId }) => {
     setEdges(flowEdges);
   }, [topology, viewerPersonId, currentUserPersonId, calculatePositions, setNodes, setEdges]);
 
+  // Handle node drag start for edge creation
+  const onNodeDragStart = useCallback((event, node) => {
+    if (edgeCreationMode) {
+      setDraggingFrom(node.id);
+    }
+  }, [edgeCreationMode]);
+
+  // Handle node drag to create preview edge
+  const onNodeDrag = useCallback((event, node) => {
+    if (edgeCreationMode && draggingFrom && draggingFrom !== node.id) {
+      setPreviewEdge({
+        id: 'preview',
+        source: draggingFrom,
+        target: node.id,
+        type: 'default',
+        style: { stroke: '#ff6b6b', strokeWidth: 2, strokeDasharray: '5,5' },
+        animated: true,
+      });
+    }
+  }, [edgeCreationMode, draggingFrom]);
+
+  // Handle node drop to create relationship
+  const onNodeDragStop = useCallback((event, node) => {
+    if (edgeCreationMode && draggingFrom && draggingFrom !== node.id && onEdgeCreate) {
+      // Get person objects for the dialog
+      const fromPerson = topology?.nodes?.find(n => String(n.id) === draggingFrom);
+      const toPerson = topology?.nodes?.find(n => String(n.id) === node.id);
+      
+      if (fromPerson && toPerson) {
+        onEdgeCreate(fromPerson, toPerson);
+      }
+    }
+    setDraggingFrom(null);
+    setPreviewEdge(null);
+  }, [edgeCreationMode, draggingFrom, onEdgeCreate, topology]);
+
+  // Combine edges with preview edge
+  const displayEdges = useMemo(() => {
+    if (previewEdge) {
+      return [...edges, previewEdge];
+    }
+    return edges;
+  }, [edges, previewEdge]);
+
   if (!topology?.nodes || topology.nodes.length === 0) {
     return (
       <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -252,12 +304,33 @@ const FamilyGraph = ({ topology, viewerPersonId, currentUserPersonId }) => {
 
   return (
     <Box sx={{ height: '100%', width: '100%' }}>
+      {edgeCreationMode && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 10,
+            left: 10,
+            zIndex: 10,
+            bgcolor: 'warning.light',
+            color: 'warning.contrastText',
+            p: 1,
+            borderRadius: 1,
+            fontSize: '0.875rem',
+          }}
+        >
+          Edge creation mode: Drag from one person to another to create a relationship
+        </Box>
+      )}
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={displayEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDrag={onNodeDrag}
+        onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
+        nodesDraggable={edgeCreationMode}
         fitView
         attributionPosition="bottom-left"
       >
