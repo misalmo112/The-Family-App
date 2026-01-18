@@ -6,11 +6,11 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
 from apps.graph.models import Person, Relationship, RelationshipTypeChoices
-from apps.graph.serializers import PersonSerializer, RelationshipSerializer, RelationshipSuggestionSerializer, BulkFamilyUnitSerializer
+from apps.graph.serializers import PersonSerializer, RelationshipSerializer, RelationshipSuggestionSerializer, BulkFamilyUnitSerializer, BulkRelationshipSerializer
 from apps.graph.services.relationship_service import add_parent, add_spouse, delete_relationship
 from apps.graph.services.relationship_suggestions import get_related_suggestions
 from apps.graph.services.relationship_completion import analyze_missing_relationships
-from apps.graph.services.bulk_relationship_service import create_family_unit
+from apps.graph.services.bulk_relationship_service import create_family_unit, create_bulk_relationships
 
 
 def is_family_admin(user, family):
@@ -521,3 +521,52 @@ class BulkFamilyUnitView(APIView):
                 'errors': result['errors'],
                 'relationships': RelationshipSerializer(result['created'], many=True).data
             }, status=status.HTTP_207_MULTI_STATUS)
+
+
+class BulkRelationshipView(APIView):
+    """Create multiple relationships using user-friendly labels in one operation"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Create multiple relationships from labels"""
+        serializer = BulkRelationshipSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        family = serializer.validated_data['family']
+        if not is_family_admin(request.user, family):
+            return Response(
+                {'error': 'Only family admins can create relationships'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        relationship_requests = serializer.validated_data['relationships']
+        
+        result = create_bulk_relationships(family, relationship_requests)
+        
+        response_data = {
+            'created_count': len(result['created']),
+            'failed_count': len(result['failed']),
+            'relationships': RelationshipSerializer(result['created'], many=True).data,
+            'warnings': result['warnings']
+        }
+        
+        if result['failed']:
+            response_data['failed'] = [
+                {
+                    'viewer_id': req['request']['viewer_id'],
+                    'target_id': req['request']['target_id'],
+                    'label': req['request']['label'],
+                    'error': req['error']
+                }
+                for req in result['failed']
+            ]
+        
+        if result['success']:
+            return Response(response_data, status=status.HTTP_201_CREATED)
+        elif len(result['created']) > 0:
+            # Partial success
+            return Response(response_data, status=status.HTTP_207_MULTI_STATUS)
+        else:
+            # All failed
+            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)

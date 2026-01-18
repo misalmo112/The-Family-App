@@ -474,3 +474,68 @@ export function isDirectLabel(label) {
 export function isIndirectLabel(label) {
   return INDIRECT_LABELS.includes(label.toLowerCase());
 }
+
+/**
+ * Translate multiple relationship requests to edges
+ * Handles dependencies between relationships and aggregates results
+ * @param {Array<Object>} requests - Array of {viewerId, targetId, label} objects
+ * @param {Object} topology - Topology object with nodes and edges
+ * @returns {Object} { edges: Array, missingPersons: Array, warnings: Array, requestResults: Array }
+ */
+export function translateBulkRelationships(requests, topology) {
+  const allEdges = [];
+  const allMissingPersons = [];
+  const allWarnings = [];
+  const requestResults = [];
+  
+  // Process each request
+  for (const request of requests) {
+    const { viewerId, targetId, label } = request;
+    
+    // Translate this relationship
+    const translation = translateLabel(label, viewerId, targetId, topology);
+    
+    // Track which edges came from which request
+    const requestEdges = translation.edges.map(edge => ({
+      ...edge,
+      _request: request, // Store reference to original request
+    }));
+    
+    allEdges.push(...requestEdges);
+    allMissingPersons.push(...translation.missingPersons.map(mp => ({
+      ...mp,
+      request,
+    })));
+    allWarnings.push(...translation.warnings.map(w => ({
+      message: w,
+      request,
+    })));
+    
+    requestResults.push({
+      request,
+      edges: translation.edges,
+      missingPersons: translation.missingPersons,
+      warnings: translation.warnings,
+      valid: translation.missingPersons.length === 0 && translation.warnings.length === 0,
+    });
+  }
+  
+  // Remove duplicate edges (same from, to, type)
+  const uniqueEdges = [];
+  const edgeKeys = new Set();
+  
+  for (const edge of allEdges) {
+    const key = `${edge.from}-${edge.to}-${edge.type}`;
+    if (!edgeKeys.has(key)) {
+      edgeKeys.add(key);
+      uniqueEdges.push(edge);
+    }
+  }
+  
+  return {
+    edges: uniqueEdges,
+    missingPersons: allMissingPersons,
+    warnings: allWarnings,
+    requestResults,
+  };
+}

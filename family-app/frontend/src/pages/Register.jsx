@@ -10,6 +10,8 @@ import {
   Alert,
   MenuItem,
   CircularProgress,
+  Stack,
+  Chip,
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { register } from '../services/auth';
@@ -93,10 +95,16 @@ const Register = () => {
           minHeight: '100vh',
         }}
       >
-        <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, width: '100%' }}>
-          <Typography variant="h4" component="h1" gutterBottom align="center">
-            Register
-          </Typography>
+        <Paper elevation={0} sx={{ p: { xs: 3, sm: 4 }, width: '100%', borderRadius: 4 }}>
+          <Stack spacing={1} alignItems="center" sx={{ mb: 3 }}>
+            <Chip label="Create account" color="primary" />
+            <Typography variant="h4" component="h1">
+              Join Family Network
+            </Typography>
+            <Typography variant="body2" color="text.secondary" align="center">
+              Your profile will be reused across families.
+            </Typography>
+          </Stack>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
               {error}

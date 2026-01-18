@@ -136,12 +136,12 @@ const Settings = () => {
 
   return (
     <Container maxWidth="md">
-      <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 4 }}>
+      <Typography variant="h3" component="h1" gutterBottom sx={{ mb: 4 }}>
         Settings
       </Typography>
 
       {/* Profile Edit Section */}
-      <Card elevation={2} sx={{ mb: 4 }}>
+      <Card elevation={0} sx={{ mb: 4 }}>
         <CardContent>
           <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3 }}>
             Edit Profile
@@ -254,7 +254,7 @@ const Settings = () => {
       </Card>
 
       {/* Change Password Section */}
-      <Card elevation={2}>
+      <Card elevation={0}>
         <CardContent>
           <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3 }}>
             Change Password

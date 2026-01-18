@@ -429,6 +429,7 @@ const Feed = () => {
   const observerTarget = useRef(null);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const didInitialScrollRef = useRef(false);
 
   // Composer state
   const [composerText, setComposerText] = useState('');
@@ -494,6 +495,7 @@ const Feed = () => {
     // Reset posts and page when family changes
     setPosts([]);
     setPage(1);
+    didInitialScrollRef.current = false;
     fetchPosts(activeFamilyId, 1, true);
   }, [activeFamilyId, navigate]);
 
@@ -579,12 +581,13 @@ const Feed = () => {
 
   // Initial scroll to bottom when posts are first loaded
   useEffect(() => {
-    if (posts.length > 0 && !loading) {
+    if (!didInitialScrollRef.current && posts.length > 0 && !loading) {
+      didInitialScrollRef.current = true;
       setTimeout(() => {
-        scrollToBottom();
+        scrollToBottom('auto');
       }, 100);
     }
-  }, [activeFamilyId]); // Scroll to bottom when family changes
+  }, [posts.length, loading]);
 
   /**
    * Handle composer submit
@@ -639,7 +642,7 @@ const Feed = () => {
       
       // Scroll to bottom after a brief delay to allow DOM update
       setTimeout(() => {
-        scrollToBottom();
+        scrollToBottom('auto');
       }, 100);
     } catch (err) {
       console.error('Error creating post:', err);
@@ -802,9 +805,9 @@ const Feed = () => {
   /**
    * Scroll to bottom of messages
    */
-  const scrollToBottom = () => {
+  const scrollToBottom = (behavior = 'auto') => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current.scrollIntoView({ behavior });
     } else if (messagesContainerRef.current) {
       // Fallback: scroll container to bottom
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
@@ -829,7 +832,7 @@ const Feed = () => {
 
   if (loading && posts.length === 0) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: 'background.default' }}>
         <Box sx={{ flex: 1, p: 2 }}>
           <SkeletonPostList count={3} />
         </Box>
@@ -839,7 +842,7 @@ const Feed = () => {
 
   if (error) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: 'background.default' }}>
         <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
           <Box>
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -860,8 +863,9 @@ const Feed = () => {
         sx={{
           display: 'flex',
           flexDirection: 'column',
-          height: '100vh',
+          height: '100%',
           bgcolor: 'background.default',
+          minHeight: 0,
         }}
       >
         {/* Chat Header */}
@@ -910,15 +914,15 @@ const Feed = () => {
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           }}
         >
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 1,
-              p: 2,
-              pb: 1, // Less padding at bottom
-            }}
-          >
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1,
+                p: 2,
+                pb: 8, // Leave space so composer does not cover latest messages
+              }}
+            >
             {loading && posts.length === 0 ? (
               <SkeletonPostList count={3} />
             ) : posts.length === 0 ? (
@@ -975,7 +979,6 @@ const Feed = () => {
           </Box>
         </Box>
 
-        {/* Composer - Fixed at bottom (WhatsApp style) */}
         <Paper
           elevation={0}
           sx={{
@@ -984,6 +987,9 @@ const Feed = () => {
             borderColor: 'divider',
             bgcolor: 'background.paper',
             flexShrink: 0,
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 2,
           }}
         >
           {composerError && (

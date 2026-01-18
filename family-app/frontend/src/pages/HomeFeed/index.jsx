@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Chip,
+  Stack,
+  Alert,
+  Button,
+} from '@mui/material';
 import { useFamily } from '../../context/FamilyContext';
 import { getFeed } from '../../services/feed';
 
@@ -8,7 +18,7 @@ import { getFeed } from '../../services/feed';
  * Displays posts for the active family with type, text, and created_at
  */
 const HomeFeed = () => {
-  const { activeFamilyId } = useFamily();
+  const { activeFamilyId, activeFamilyName } = useFamily();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -61,98 +71,68 @@ const HomeFeed = () => {
 
   if (loading && posts.length === 0) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <p>Loading posts...</p>
-      </div>
+      <Box sx={{ py: 8, textAlign: 'center' }}>
+        <Typography variant="body1" color="text.secondary">
+          Loading feed...
+        </Typography>
+      </Box>
     );
   }
 
   if (error) {
     return (
-      <div style={{ padding: '2rem' }}>
-        <div
-          style={{
-            padding: '1rem',
-            backgroundColor: '#fee',
-            border: '1px solid #fcc',
-            borderRadius: '4px',
-            marginBottom: '1rem',
-          }}
-        >
-          <p style={{ color: '#c00', margin: 0 }}>{error}</p>
-        </div>
-        <button
-          onClick={fetchPosts}
-          style={{
-            padding: '0.5rem 1rem',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
+      <Box sx={{ py: 4 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+        <Button variant="contained" onClick={fetchPosts}>
           Retry
-        </button>
-      </div>
+        </Button>
+      </Box>
     );
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-      <h1 style={{ marginBottom: '1rem' }}>Feed</h1>
+    <Box sx={{ maxWidth: 920, mx: 'auto' }}>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h3" component="h1" gutterBottom>
+          {activeFamilyName ? `${activeFamilyName} Feed` : 'Feed'}
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Messages, posts, and announcements appear in one timeline.
+        </Typography>
+      </Box>
 
       {posts.length === 0 ? (
-        <div style={{ padding: '2rem', textAlign: 'center' }}>
-          <p>No posts yet. Be the first to post!</p>
-        </div>
+        <Box sx={{ py: 6, textAlign: 'center' }}>
+          <Typography variant="body1" color="text.secondary">
+            No posts yet. Be the first to post!
+          </Typography>
+        </Box>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <Stack spacing={2}>
           {posts.map((post) => (
-            <div
-              key={post.id}
-              style={{
-                padding: '1.5rem',
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                backgroundColor: '#fff',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '0.5rem',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '0.85rem',
-                    color: '#666',
-                    padding: '0.25rem 0.5rem',
-                    backgroundColor: post.type === 'ANNOUNCEMENT' ? '#fff3cd' : '#e7f3ff',
-                    borderRadius: '4px',
-                  }}
-                >
-                  {post.type}
-                </span>
-              </div>
-              <p style={{ margin: '0.5rem 0', whiteSpace: 'pre-wrap' }}>{post.text}</p>
-              <div
-                style={{
-                  fontSize: '0.85rem',
-                  color: '#666',
-                  marginTop: '0.5rem',
-                }}
-              >
-                {new Date(post.created_at).toLocaleString()}
-              </div>
-            </div>
+            <Card key={post.id}>
+              <CardContent>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+                  <Chip
+                    label={post.type}
+                    color={post.type === 'ANNOUNCEMENT' ? 'secondary' : 'primary'}
+                    variant={post.type === 'ANNOUNCEMENT' ? 'outlined' : 'filled'}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {new Date(post.created_at).toLocaleString()}
+                  </Typography>
+                </Stack>
+                <Typography variant="body1" sx={{ mt: 2, whiteSpace: 'pre-wrap' }}>
+                  {post.text}
+                </Typography>
+              </CardContent>
+            </Card>
           ))}
-        </div>
+        </Stack>
       )}
-    </div>
+    </Box>
   );
 };
 

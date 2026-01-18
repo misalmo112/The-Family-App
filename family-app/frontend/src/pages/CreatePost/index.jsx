@@ -126,10 +126,13 @@ const CreatePost = () => {
 
   return (
     <PageTransition>
-      <Container maxWidth="sm" sx={{ py: 4 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 3 }}>
-          Create Post
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Paper elevation={0} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 1 }}>
+          Create a post
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Long-form updates live inside the family timeline.
         </Typography>
 
         {error && (
@@ -196,7 +199,7 @@ const CreatePost = () => {
             }}
           />
 
-          <Stack direction="row" spacing={2} justifyContent="flex-end">
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="flex-end">
             <Button
               variant="outlined"
               onClick={() => navigate('/feed')}

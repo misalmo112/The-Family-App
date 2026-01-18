@@ -307,11 +307,11 @@ const AdminJoinRequests = () => {
 
   return (
     <Box>
-      <Typography variant="h4" component="h1" gutterBottom>
+      <Typography variant="h3" component="h1" gutterBottom>
         Join Requests
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        Review and manage pending join requests for your families
+        Review and manage pending join requests for your families.
       </Typography>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {requests.map((request) => (

@@ -148,6 +148,52 @@ class BulkFamilyUnitSerializer(serializers.Serializer):
         return attrs
 
 
+class BulkRelationshipRequestSerializer(serializers.Serializer):
+    """Serializer for a single relationship request in bulk operation"""
+    viewer_id = serializers.IntegerField()
+    target_id = serializers.IntegerField()
+    label = serializers.CharField(max_length=50)
+    
+    def validate(self, attrs):
+        """Validate that viewer_id and target_id are different"""
+        if attrs['viewer_id'] == attrs['target_id']:
+            raise serializers.ValidationError('Viewer and target cannot be the same person')
+        return attrs
+
+
+class BulkRelationshipSerializer(serializers.Serializer):
+    """Serializer for bulk relationship creation"""
+    family_id = serializers.IntegerField()
+    relationships = BulkRelationshipRequestSerializer(many=True, min_length=1)
+    
+    def validate(self, attrs):
+        """Validate that all person IDs exist and belong to the family"""
+        family_id = attrs['family_id']
+        try:
+            family = Family.objects.get(id=family_id)
+        except Family.DoesNotExist:
+            raise serializers.ValidationError({'family_id': 'Family not found.'})
+        
+        # Collect all person IDs
+        person_ids = set()
+        for rel in attrs['relationships']:
+            person_ids.add(rel['viewer_id'])
+            person_ids.add(rel['target_id'])
+        
+        # Verify all persons exist and belong to the family
+        persons = Person.objects.filter(id__in=person_ids, family=family)
+        found_ids = set(persons.values_list('id', flat=True))
+        missing_ids = person_ids - found_ids
+        
+        if missing_ids:
+            raise serializers.ValidationError({
+                'relationships': f'Persons with IDs {missing_ids} not found or do not belong to this family.'
+            })
+        
+        attrs['family'] = family
+        return attrs
+
+
 class TopologyResponseSerializer(serializers.Serializer):
     """Serializer for topology response"""
     family_id = serializers.IntegerField()

@@ -160,10 +160,10 @@ const Onboarding = () => {
             Logout
           </Button>
           <Typography variant="h3" component="h1" gutterBottom align="center">
-            Welcome to Family App
+            Welcome to Family Network
           </Typography>
           <Typography variant="h6" color="text.secondary" align="center" sx={{ mb: 2 }}>
-            Get started by creating a new family or joining an existing one
+            Create a new family space or join an existing one.
           </Typography>
           
           <Box sx={{ display: 'flex', gap: 3, width: '100%', maxWidth: 600 }}>
@@ -257,7 +257,7 @@ const Onboarding = () => {
         >
           Logout
         </Button>
-        <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
+        <Paper elevation={0} sx={{ p: 4, width: '100%', borderRadius: 4 }}>
           <Typography variant="h4" component="h1" gutterBottom align="center">
             {mode === 'create' ? 'Create a Family' : 'Join a Family'}
           </Typography>

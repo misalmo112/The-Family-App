@@ -182,6 +182,25 @@ export const createFamilyUnit = async ({ familyId, parent1Id, parent2Id, childre
 };
 
 /**
+ * Create multiple relationships in bulk using user-friendly labels
+ * @param {Object} params - Bulk relationship parameters
+ * @param {number} params.familyId - The family ID
+ * @param {Array<Object>} params.relationships - Array of relationship objects with viewerId, targetId, label
+ * @returns {Promise<Object>} Result with created relationships, failed relationships, and warnings
+ */
+export const createBulkRelationships = async ({ familyId, relationships }) => {
+  const response = await api.post('/api/graph/relationships/bulk/', {
+    family_id: familyId,
+    relationships: relationships.map(rel => ({
+      viewer_id: rel.viewerId,
+      target_id: rel.targetId,
+      label: rel.label,
+    })),
+  });
+  return response.data;
+};
+
+/**
  * Get the current user's person ID in a family
  * Uses heuristic: tries to fetch posts with scope=all_families for each person
  * The person that succeeds is the current user's person

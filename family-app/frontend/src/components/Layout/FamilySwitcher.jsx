@@ -75,17 +75,18 @@ const FamilySwitcher = () => {
       fullWidth
       size="small"
       sx={{
+        maxWidth: 280,
         '& .MuiOutlinedInput-root': {
-          backgroundColor: 'background.default',
+          backgroundColor: 'rgba(255,255,255,0.6)',
         },
       }}
     >
-      <InputLabel id="family-switcher-label">Active Family</InputLabel>
+      <InputLabel id="family-switcher-label">Family</InputLabel>
       <Select
         labelId="family-switcher-label"
         id="family-switcher"
         value={activeFamilyId || ''}
-        label="Active Family"
+        label="Family"
         onChange={handleFamilyChange}
       >
         {!activeFamilyId && (

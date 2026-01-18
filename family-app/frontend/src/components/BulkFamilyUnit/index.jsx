@@ -137,6 +137,21 @@ const BulkFamilyUnit = ({
       onClose={onClose}
       maxWidth="md"
       fullWidth
+      PaperProps={{
+        sx: {
+          bgcolor: 'background.paper',
+          backdropFilter: 'none',
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: 6,
+        },
+      }}
+      sx={{
+        '& .MuiBackdrop-root': {
+          bgcolor: 'rgba(10, 12, 16, 0.6)',
+          backdropFilter: 'blur(2px)',
+        },
+      }}
     >
       <DialogTitle>
         <Box display="flex" alignItems="center" gap={1}>

@@ -89,9 +89,12 @@ const JoinFamily = () => {
           py: 4,
         }}
       >
-        <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
+        <Paper elevation={0} sx={{ p: 4, width: '100%', borderRadius: 4 }}>
           <Typography variant="h4" component="h1" gutterBottom align="center">
             Join a Family
+          </Typography>
+          <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 2 }}>
+            Use the private family code provided by an admin.
           </Typography>
 
           {error && (

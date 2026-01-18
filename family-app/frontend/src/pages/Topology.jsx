@@ -40,6 +40,9 @@ import {
   TableHead,
   TableRow,
   Paper,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -63,6 +66,7 @@ import { checkIsFamilyAdmin } from '../services/families';
 import RelationshipWizard from '../components/RelationshipWizard';
 import FamilyGraph from '../components/FamilyGraph';
 import BulkFamilyUnit from '../components/BulkFamilyUnit';
+import BulkRelationshipInput from '../components/BulkRelationshipInput';
 import RelationshipTypeSelector from '../components/RelationshipTypeSelector';
 
 const Topology = () => {
@@ -119,6 +123,7 @@ const Topology = () => {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [showAdvancedMode, setShowAdvancedMode] = useState(false);
   const [bulkFamilyUnitOpen, setBulkFamilyUnitOpen] = useState(false);
+  const [bulkRelationshipInputOpen, setBulkRelationshipInputOpen] = useState(false);
   
   // Create Person form state
   const [personFirstName, setPersonFirstName] = useState('');
@@ -147,6 +152,23 @@ const Topology = () => {
   const [typeSelectorOpen, setTypeSelectorOpen] = useState(false);
   const [edgeFromPerson, setEdgeFromPerson] = useState(null);
   const [edgeToPerson, setEdgeToPerson] = useState(null);
+  
+  // Accordion expansion state
+  const [expandedSections, setExpandedSections] = useState({
+    viewControls: false,
+    addManage: false,
+    relationshipsList: false,
+  });
+  
+  // Nested accordion state for Add & Manage section
+  const [expandedAddManage, setExpandedAddManage] = useState({
+    addPerson: false,
+    createFamilyUnit: false,
+    bulkRelationships: false,
+    addRelationship: false,
+    relationshipSuggestions: false,
+    manageRelationships: false,
+  });
 
   // Fetch user data (person ID and admin status) when activeFamilyId changes
   useEffect(() => {
@@ -575,11 +597,14 @@ const Topology = () => {
   };
 
   if (!activeFamilyId) {
-    return (
-      <Box>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Topology
-        </Typography>
+  return (
+    <Box>
+      <Typography variant="h3" component="h1" gutterBottom>
+        Family Topology
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Visualize relationships and add new connections.
+      </Typography>
         <Alert severity="info">
           Please select a family to view its topology.
         </Alert>
@@ -601,46 +626,6 @@ const Topology = () => {
           {error}
         </Alert>
       )}
-
-      {/* View Controls - Available to Everyone */}
-      <Card sx={{ mb: 3 }}>
-        <CardHeader
-          title="View Controls"
-          avatar={<SettingsIcon />}
-        />
-        <CardContent>
-          <Stack spacing={2}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={viewModeToggle === 'ego'}
-                  onChange={(e) => setViewModeToggle(e.target.checked ? 'ego' : 'full')}
-                />
-              }
-              label={viewModeToggle === 'ego' ? 'Ego View (Your Perspective)' : 'Full Family View'}
-            />
-            {viewModeToggle === 'full' && (
-              <FormControl fullWidth>
-                <InputLabel id="viewer-select-label">Viewer Person</InputLabel>
-                <Select
-                  labelId="viewer-select-label"
-                  id="viewer-select"
-                  value={viewerPersonId || ''}
-                  label="Viewer Person"
-                  onChange={(e) => setViewerPersonId(e.target.value)}
-                  disabled={loadingPersons || persons.length === 0}
-                >
-                  {persons.map((person) => (
-                    <MenuItem key={person.id} value={person.id}>
-                      {person.first_name} {person.last_name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
-          </Stack>
-        </CardContent>
-      </Card>
 
       {/* View Mode Toggle */}
       <Box display="flex" justifyContent="flex-end" mb={2}>
@@ -681,622 +666,18 @@ const Topology = () => {
         )}
       </Box>
 
-      {/* Add Person Card - Admin Only */}
-      {isFamilyAdmin && (
-        <Card sx={{ mb: 3 }}>
-          <CardHeader
-            title="Add Family Member"
-            subheader="Create a new person in the family topology (no user account required)"
-            avatar={<PersonAddIcon />}
-          />
-          <CardContent>
-            {personError && (
-              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setPersonError(null)}>
-                {personError}
-              </Alert>
-            )}
-            
-            {personSuccess && (
-              <Alert severity="success" sx={{ mb: 2 }} onClose={() => setPersonSuccess(false)}>
-                Person created successfully! They will appear in the family members list.
-              </Alert>
-            )}
-
-            <Stack spacing={2}>
-              <TextField
-                fullWidth
-                label="First Name"
-                value={personFirstName}
-                onChange={(e) => setPersonFirstName(e.target.value)}
-                required
-                disabled={creatingPerson}
-                error={personError && !personFirstName.trim()}
-              />
-
-              <TextField
-                fullWidth
-                label="Last Name"
-                value={personLastName}
-                onChange={(e) => setPersonLastName(e.target.value)}
-                required
-                disabled={creatingPerson}
-                error={personError && !personLastName.trim()}
-              />
-
-              <TextField
-                fullWidth
-                label="Date of Birth"
-                type="date"
-                value={personDob}
-                onChange={(e) => setPersonDob(e.target.value)}
-                disabled={creatingPerson}
-                InputLabelProps={{
-                  shrink: true,
-                }}
-                helperText="Optional - Format: YYYY-MM-DD"
-              />
-
-              <FormControl fullWidth required>
-                <InputLabel id="person-gender-label">Gender</InputLabel>
-                <Select
-                  labelId="person-gender-label"
-                  id="person-gender-select"
-                  value={personGender}
-                  label="Gender"
-                  onChange={(e) => setPersonGender(e.target.value)}
-                  disabled={creatingPerson}
-                >
-                  <MenuItem value="UNKNOWN">
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <PersonIcon fontSize="small" />
-                      <span>Unknown</span>
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="MALE">
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <WcIcon fontSize="small" />
-                      <span>Male</span>
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="FEMALE">
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <WcIcon fontSize="small" />
-                      <span>Female</span>
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="OTHER">
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <PersonIcon fontSize="small" />
-                      <span>Other</span>
-                    </Box>
-                  </MenuItem>
-                </Select>
-              </FormControl>
-
-              <Button
-                variant="contained"
-                onClick={handleCreatePerson}
-                disabled={creatingPerson || !personFirstName.trim() || !personLastName.trim() || !personGender}
-                startIcon={creatingPerson ? <CircularProgress size={20} /> : <PersonAddIcon />}
-                fullWidth
-              >
-                {creatingPerson ? 'Creating...' : 'Create Person'}
-              </Button>
-            </Stack>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Create Family Unit Card */}
-      {isFamilyAdmin && (
-        <Card sx={{ mb: 3 }}>
-          <CardHeader
-            title="Create Family Unit"
-            subheader="Create an entire family unit (parents + children) in one operation"
-            avatar={<FamilyRestroomIcon />}
-          />
-          <CardContent>
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Quickly create a family unit by selecting parents and children. All relationships will be created automatically.
-            </Alert>
-            <Button
-              variant="contained"
-              size="large"
-              fullWidth
-              startIcon={<FamilyRestroomIcon />}
-              onClick={() => setBulkFamilyUnitOpen(true)}
-              disabled={persons.length < 2}
-            >
-              Create Family Unit
-            </Button>
-            {persons.length < 2 && (
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                You need at least 2 people in the family to create a family unit.
-              </Typography>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Add Relationship Card */}
-      <Card sx={{ mb: 3 }}>
-        <CardHeader
-          title="Add Relationship"
-          subheader="Connect family members by creating relationships"
-          avatar={<AddLinkIcon />}
-          action={
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={showAdvancedMode ? <AutoAwesomeIcon /> : <SettingsIcon />}
-              onClick={() => setShowAdvancedMode(!showAdvancedMode)}
-              sx={{ mr: 1 }}
-            >
-              {showAdvancedMode ? 'Wizard Mode' : 'Advanced Mode'}
-            </Button>
-          }
-        />
-        <CardContent>
-          {!showAdvancedMode ? (
-            <Box>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                Use the wizard to add relationships with user-friendly labels like "father", "mother", "uncle", etc.
-              </Alert>
-              <Button
-                variant="contained"
-                size="large"
-                fullWidth
-                startIcon={<AutoAwesomeIcon />}
-                onClick={() => setWizardOpen(true)}
-                disabled={persons.length < 2}
-              >
-                Open Relationship Wizard
-              </Button>
-              {persons.length < 2 && (
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                  You need at least 2 people in the family to create relationships.
-                </Typography>
-              )}
-            </Box>
-          ) : (
-            <>
-              {relationshipError && (
-                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setRelationshipError(null)}>
-                  {relationshipError}
-                </Alert>
-              )}
-              
-              {relationshipSuccess && (
-                <Alert severity="success" sx={{ mb: 2 }} onClose={() => setRelationshipSuccess(false)}>
-                  Relationship created successfully!
-                </Alert>
-              )}
-
-              <Stack spacing={2}>
-            <FormControl fullWidth>
-              <InputLabel id="from-person-label">From Person</InputLabel>
-              <Select
-                labelId="from-person-label"
-                id="from-person-select"
-                value={fromPersonId}
-                label="From Person"
-                onChange={(e) => {
-                  setFromPersonId(e.target.value);
-                  // Reset to person if same as from person
-                  if (e.target.value === toPersonId) {
-                    setToPersonId('');
-                  }
-                }}
-                disabled={submittingRelationship || persons.length === 0}
-              >
-                {persons.map((person) => (
-                  <MenuItem key={person.id} value={person.id}>
-                    {person.first_name} {person.last_name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth>
-              <InputLabel id="to-person-label">To Person</InputLabel>
-              <Select
-                labelId="to-person-label"
-                id="to-person-select"
-                value={toPersonId}
-                label="To Person"
-                onChange={(e) => setToPersonId(e.target.value)}
-                disabled={submittingRelationship || persons.length === 0 || !fromPersonId}
-              >
-                {persons
-                  .filter((person) => person.id !== parseInt(fromPersonId))
-                  .map((person) => (
-                    <MenuItem key={person.id} value={person.id}>
-                      {person.first_name} {person.last_name}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth>
-              <InputLabel id="relationship-type-label">Relationship Type</InputLabel>
-              <Select
-                labelId="relationship-type-label"
-                id="relationship-type-select"
-                value={relationshipType}
-                label="Relationship Type"
-                onChange={(e) => setRelationshipType(e.target.value)}
-                disabled={submittingRelationship}
-              >
-                <MenuItem value="PARENT_OF">
-                  <Box display="flex" alignItems="center" gap={1}>
-                    <FamilyRestroomIcon fontSize="small" />
-                    <span>Parent Of</span>
-                  </Box>
-                </MenuItem>
-                <MenuItem value="SPOUSE_OF">
-                  <Box display="flex" alignItems="center" gap={1}>
-                    <WcIcon fontSize="small" />
-                    <span>Spouse Of</span>
-                  </Box>
-                </MenuItem>
-              </Select>
-            </FormControl>
-
-            <Button
-              variant="contained"
-              onClick={handleAddRelationship}
-              disabled={submittingRelationship || !fromPersonId || !toPersonId || !relationshipType}
-              startIcon={submittingRelationship ? <CircularProgress size={20} /> : <AddLinkIcon />}
-            >
-              {submittingRelationship ? 'Adding...' : 'Add Relationship'}
-            </Button>
-              </Stack>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Relationship Wizard */}
-      <RelationshipWizard
-        open={wizardOpen}
-        onClose={() => setWizardOpen(false)}
-        familyId={activeFamilyId}
-        persons={persons}
-        topology={topology}
-        viewerPersonId={viewerPersonId}
-        currentUserPersonId={currentUserPersonId}
-        isAdmin={isFamilyAdmin}
-        onSuccess={async () => {
-          // Refetch topology after successful relationship creation
-          await fetchTopologyData();
-          // Refetch relationships list
-          const updatedRelationships = await getRelationships({ familyId: activeFamilyId });
-          setRelationships(updatedRelationships || []);
-        }}
-      />
-
-      {/* Bulk Family Unit Dialog */}
-      <BulkFamilyUnit
-        open={bulkFamilyUnitOpen}
-        onClose={() => setBulkFamilyUnitOpen(false)}
-        familyId={activeFamilyId}
-        persons={persons}
-        onSuccess={async () => {
-          // Refetch topology after successful family unit creation
-          await fetchTopologyData();
-          // Refetch relationships list
-          const updatedRelationships = await getRelationships({ familyId: activeFamilyId });
-          setRelationships(updatedRelationships || []);
-        }}
-      />
-
-      {/* Relationship Type Selector Dialog */}
-      <RelationshipTypeSelector
-        open={typeSelectorOpen}
-        onClose={() => {
-          setTypeSelectorOpen(false);
-          setEdgeFromPerson(null);
-          setEdgeToPerson(null);
-        }}
-        fromPerson={edgeFromPerson}
-        toPerson={edgeToPerson}
-        onConfirm={async (relationshipData) => {
-          try {
-            await createRelationship({
-              familyId: activeFamilyId,
-              fromPersonId: relationshipData.fromPersonId,
-              toPersonId: relationshipData.toPersonId,
-              type: relationshipData.type,
-            });
-            // Refetch topology after successful relationship creation
-            await fetchTopologyData();
-            // Refetch relationships list
-            const updatedRelationships = await getRelationships({ familyId: activeFamilyId });
-            setRelationships(updatedRelationships || []);
-            setTypeSelectorOpen(false);
-            setEdgeFromPerson(null);
-            setEdgeToPerson(null);
-          } catch (err) {
-            console.error('Error creating relationship:', err);
-            // Error will be shown in the dialog or we could add error state
-          }
-        }}
-      />
-
-      {/* Relationship Completion Suggestions Card */}
-      {isFamilyAdmin && (
-        <Card sx={{ mb: 3 }}>
-          <CardHeader
-            title="Relationship Suggestions"
-            subheader="Find and add missing relationships"
-            avatar={<AutoAwesomeIcon />}
-            action={
-              <IconButton
-                onClick={() => setCompletionPanelOpen(!completionPanelOpen)}
-                aria-label="toggle completion panel"
-              >
-                {completionPanelOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-              </IconButton>
-            }
-          />
-          <Collapse in={completionPanelOpen}>
-            <Divider />
-            <CardContent>
-              <Box sx={{ mb: 2 }}>
-                <Button
-                  variant="outlined"
-                  onClick={async () => {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:1032',message:'Analyze button clicked',data:{activeFamilyId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-                    // #endregion
-                    if (!activeFamilyId) return;
-                    setLoadingCompletion(true);
-                    try {
-                      // #region agent log
-                      fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:1036',message:'Calling getRelationshipCompletion',data:{familyId:activeFamilyId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-                      // #endregion
-                      const suggestions = await getRelationshipCompletion({ familyId: activeFamilyId });
-                      // #region agent log
-                      fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:1037',message:'getRelationshipCompletion success',data:{suggestionsCount:suggestions?.length||0,suggestions},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-                      // #endregion
-                      setCompletionSuggestions(suggestions || []);
-                    } catch (err) {
-                      // #region agent log
-                      fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:1039',message:'getRelationshipCompletion error',data:{error:err.message,errorStack:err.stack,response:err.response?.data,status:err.response?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                      // #endregion
-                      console.error('Error fetching completion suggestions:', err);
-                      setCompletionSuggestions([]);
-                    } finally {
-                      setLoadingCompletion(false);
-                    }
-                  }}
-                  disabled={loadingCompletion || !activeFamilyId}
-                  startIcon={loadingCompletion ? <CircularProgress size={16} /> : <AutoAwesomeIcon />}
-                >
-                  {loadingCompletion ? 'Analyzing...' : 'Analyze Missing Relationships'}
-                </Button>
-              </Box>
-
-              {completionSuggestions.length > 0 ? (
-                <Box>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Found {completionSuggestions.length} suggestion(s):
-                  </Typography>
-                  <List dense>
-                    {completionSuggestions.map((suggestion, index) => {
-                      const fromPerson = persons.find(p => p.id === suggestion.from_person_id);
-                      const toPerson = persons.find(p => p.id === suggestion.to_person_id);
-                      const getPersonName = (person) => {
-                        if (!person) return `Person ${suggestion.from_person_id || suggestion.to_person_id}`;
-                        return `${person.first_name || ''} ${person.last_name || ''}`.trim() || `Person ${person.id}`;
-                      };
-                      return (
-                        <ListItem key={index}>
-                          <ListItemText
-                            primary={
-                              <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-                                <Typography variant="body2">
-                                  {getPersonName(fromPerson)}
-                                </Typography>
-                                <ArrowForwardIcon fontSize="small" />
-                                <Typography variant="body2">
-                                  {getPersonName(toPerson)}
-                                </Typography>
-                                <Chip
-                                  label={suggestion.relationship_type.replace('_', ' ')}
-                                  size="small"
-                                  color="primary"
-                                />
-                              </Box>
-                            }
-                            secondary={
-                              <Typography variant="body2" color="text.secondary">
-                                {suggestion.reason}
-                              </Typography>
-                            }
-                          />
-                          <ListItemSecondaryAction>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              onClick={async () => {
-                                try {
-                                  await createRelationship({
-                                    familyId: activeFamilyId,
-                                    fromPersonId: suggestion.from_person_id,
-                                    toPersonId: suggestion.to_person_id,
-                                    type: suggestion.relationship_type,
-                                  });
-                                  // Remove from suggestions list
-                                  setCompletionSuggestions(prev => prev.filter((_, i) => i !== index));
-                                  // Refresh topology
-                                  await fetchTopologyData();
-                                } catch (err) {
-                                  console.error('Error creating suggested relationship:', err);
-                                }
-                              }}
-                            >
-                              Add
-                            </Button>
-                          </ListItemSecondaryAction>
-                        </ListItem>
-                      );
-                    })}
-                  </List>
-                </Box>
-              ) : loadingCompletion ? (
-                <Box display="flex" justifyContent="center" p={2}>
-                  <CircularProgress size={24} />
-                </Box>
-              ) : (
-                <Alert severity="info">
-                  Click "Analyze Missing Relationships" to find relationship suggestions.
-                </Alert>
-              )}
-            </CardContent>
-          </Collapse>
-        </Card>
-      )}
-
-      {/* Manage Relationships Card - Admin Only */}
-      {isFamilyAdmin && (
-        <Card sx={{ mb: 3 }}>
-          <CardHeader
-            title="Manage Relationships"
-            subheader="View and delete relationships"
-            avatar={<AccountTreeIcon />}
-          />
-          <Divider />
-          <CardContent>
-            {loadingRelationships ? (
-              <Box display="flex" justifyContent="center" p={4}>
-                <CircularProgress />
-              </Box>
-            ) : relationships.length > 0 ? (
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>From Person</TableCell>
-                      <TableCell>Type</TableCell>
-                      <TableCell>To Person</TableCell>
-                      <TableCell>Created</TableCell>
-                      <TableCell align="right">Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {relationships.map((rel) => (
-                      <TableRow key={rel.id} hover>
-                        <TableCell>
-                          {rel.from_person ? `${rel.from_person.first_name} ${rel.from_person.last_name}` : `Person ${rel.from_person_id}`}
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={rel.type.replace('_', ' ')}
-                            size="small"
-                            color={rel.type === 'PARENT_OF' ? 'primary' : 'secondary'}
-                            icon={rel.type === 'PARENT_OF' ? <FamilyRestroomIcon /> : <WcIcon />}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {rel.to_person ? `${rel.to_person.first_name} ${rel.to_person.last_name}` : `Person ${rel.to_person_id}`}
-                        </TableCell>
-                        <TableCell>
-                          {rel.created_at ? new Date(rel.created_at).toLocaleDateString() : 'N/A'}
-                        </TableCell>
-                        <TableCell align="right">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleDeleteClick(rel)}
-                            aria-label="delete relationship"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            ) : (
-              <Box textAlign="center" py={4}>
-                <AccountTreeIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                <Typography variant="body2" color="text.secondary">
-                  No relationships yet.
-                </Typography>
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel} maxWidth="sm" fullWidth>
-        <DialogTitle>Delete Relationship</DialogTitle>
-        <DialogContent>
-          {deleteError && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDeleteError(null)}>
-              {deleteError}
-            </Alert>
-          )}
-          {relationshipToDelete && (
-            <Box>
-              <Typography variant="body1" gutterBottom>
-                Are you sure you want to delete this relationship?
-              </Typography>
-              <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                <Typography variant="body2" color="text.secondary">
-                  <strong>From:</strong>{' '}
-                  {relationshipToDelete.from_person
-                    ? `${relationshipToDelete.from_person.first_name} ${relationshipToDelete.from_person.last_name}`
-                    : `Person ${relationshipToDelete.from_person_id}`}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  <strong>Type:</strong> {relationshipToDelete.type.replace('_', ' ')}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  <strong>To:</strong>{' '}
-                  {relationshipToDelete.to_person
-                    ? `${relationshipToDelete.to_person.first_name} ${relationshipToDelete.to_person.last_name}`
-                    : `Person ${relationshipToDelete.to_person_id}`}
-                </Typography>
-                {relationshipToDelete.type === 'SPOUSE_OF' && (
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    This will delete both directions of the spouse relationship.
-                  </Alert>
-                )}
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDeleteCancel} disabled={deletingRelationship}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteConfirm}
-            color="error"
-            variant="contained"
-            disabled={deletingRelationship}
-            startIcon={deletingRelationship ? <CircularProgress size={20} /> : <DeleteIcon />}
-          >
-            {deletingRelationship ? 'Deleting...' : 'Delete'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Nodes Card */}
-      <Card sx={{ mb: 3 }}>
+      {/* Graph/List View - Primary Focus */}
+      <Card sx={{ mb: 3, boxShadow: 3 }}>
         <CardHeader
           title="Family Members"
           subheader={`${topology?.nodes?.length || 0} person${topology?.nodes?.length !== 1 ? 's' : ''} in the family`}
           avatar={<PersonIcon />}
+          sx={{ pb: 1 }}
         />
         <Divider />
-        <CardContent>
+        <CardContent sx={{ pt: 3 }}>
           {viewMode === 'graph' ? (
-            <Box sx={{ height: '600px', width: '100%', position: 'relative' }}>
+            <Box sx={{ height: '700px', width: '100%', position: 'relative', minHeight: '500px' }}>
               <FamilyGraph
                 topology={topology}
                 viewerPersonId={viewerPersonId}
@@ -1447,15 +828,771 @@ const Topology = () => {
         </CardContent>
       </Card>
 
-      {/* Edges Card */}
-      <Card>
-        <CardHeader
-          title="Relationships"
-          subheader={`${topology?.edges?.length || 0} relationship${topology?.edges?.length !== 1 ? 's' : ''} defined`}
-          avatar={<AccountTreeIcon />}
-        />
-        <Divider />
-        <CardContent>
+      {/* View Controls - Available to Everyone */}
+      <Accordion 
+        expanded={expandedSections.viewControls} 
+        onChange={(e, expanded) => setExpandedSections(prev => ({ ...prev, viewControls: expanded }))}
+        sx={{ mb: 2 }}
+      >
+        <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
+          <Box display="flex" alignItems="center" gap={1}>
+            <SettingsIcon color="primary" />
+            <Typography variant="h6">View Controls</Typography>
+          </Box>
+        </AccordionSummary>
+        <AccordionDetails sx={{ pt: 2 }}>
+          <Stack spacing={2}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={viewModeToggle === 'ego'}
+                  onChange={(e) => setViewModeToggle(e.target.checked ? 'ego' : 'full')}
+                />
+              }
+              label={viewModeToggle === 'ego' ? 'Ego View (Your Perspective)' : 'Full Family View'}
+            />
+            {viewModeToggle === 'full' && (
+              <FormControl fullWidth>
+                <InputLabel id="viewer-select-label">Viewer Person</InputLabel>
+                <Select
+                  labelId="viewer-select-label"
+                  id="viewer-select"
+                  value={viewerPersonId || ''}
+                  label="Viewer Person"
+                  onChange={(e) => setViewerPersonId(e.target.value)}
+                  disabled={loadingPersons || persons.length === 0}
+                >
+                  {persons.map((person) => (
+                    <MenuItem key={person.id} value={person.id}>
+                      {person.first_name} {person.last_name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+          </Stack>
+        </AccordionDetails>
+      </Accordion>
+
+      {/* Add & Manage Section */}
+      <Accordion 
+        expanded={expandedSections.addManage} 
+        onChange={(e, expanded) => setExpandedSections(prev => ({ ...prev, addManage: expanded }))}
+        sx={{ mb: 2 }}
+      >
+        <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
+          <Box display="flex" alignItems="center" gap={1}>
+            <AddLinkIcon color="primary" />
+            <Typography variant="h6">Add & Manage</Typography>
+          </Box>
+        </AccordionSummary>
+        <AccordionDetails sx={{ pt: 2 }}>
+          <Stack spacing={2}>
+            {/* Add Person Card - Admin Only */}
+            {isFamilyAdmin && (
+              <Accordion 
+                expanded={expandedAddManage.addPerson} 
+                onChange={(e, expanded) => setExpandedAddManage(prev => ({ ...prev, addPerson: expanded }))}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <PersonAddIcon color="primary" />
+                    <Typography variant="subtitle1" fontWeight={600}>Add Family Member</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Card variant="outlined">
+                    <CardHeader
+                      title="Add Family Member"
+                      subheader="Create a new person in the family topology (no user account required)"
+                      avatar={<PersonAddIcon />}
+                    />
+                    <Divider />
+                    <CardContent>
+            {personError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setPersonError(null)}>
+                {personError}
+              </Alert>
+            )}
+            
+            {personSuccess && (
+              <Alert severity="success" sx={{ mb: 2 }} onClose={() => setPersonSuccess(false)}>
+                Person created successfully! They will appear in the family members list.
+              </Alert>
+            )}
+
+            <Stack spacing={2}>
+              <TextField
+                fullWidth
+                label="First Name"
+                value={personFirstName}
+                onChange={(e) => setPersonFirstName(e.target.value)}
+                required
+                disabled={creatingPerson}
+                error={personError && !personFirstName.trim()}
+              />
+
+              <TextField
+                fullWidth
+                label="Last Name"
+                value={personLastName}
+                onChange={(e) => setPersonLastName(e.target.value)}
+                required
+                disabled={creatingPerson}
+                error={personError && !personLastName.trim()}
+              />
+
+              <TextField
+                fullWidth
+                label="Date of Birth"
+                type="date"
+                value={personDob}
+                onChange={(e) => setPersonDob(e.target.value)}
+                disabled={creatingPerson}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                helperText="Optional - Format: YYYY-MM-DD"
+              />
+
+              <FormControl fullWidth required>
+                <InputLabel id="person-gender-label">Gender</InputLabel>
+                <Select
+                  labelId="person-gender-label"
+                  id="person-gender-select"
+                  value={personGender}
+                  label="Gender"
+                  onChange={(e) => setPersonGender(e.target.value)}
+                  disabled={creatingPerson}
+                >
+                  <MenuItem value="UNKNOWN">
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <PersonIcon fontSize="small" />
+                      <span>Unknown</span>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="MALE">
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <WcIcon fontSize="small" />
+                      <span>Male</span>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="FEMALE">
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <WcIcon fontSize="small" />
+                      <span>Female</span>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="OTHER">
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <PersonIcon fontSize="small" />
+                      <span>Other</span>
+                    </Box>
+                  </MenuItem>
+                </Select>
+              </FormControl>
+
+              <Button
+                variant="contained"
+                onClick={handleCreatePerson}
+                disabled={creatingPerson || !personFirstName.trim() || !personLastName.trim() || !personGender}
+                startIcon={creatingPerson ? <CircularProgress size={20} /> : <PersonAddIcon />}
+                fullWidth
+              >
+                {creatingPerson ? 'Creating...' : 'Create Person'}
+              </Button>
+            </Stack>
+                    </CardContent>
+                  </Card>
+                </AccordionDetails>
+              </Accordion>
+            )}
+
+            {/* Create Family Unit Card */}
+            {isFamilyAdmin && (
+              <Accordion 
+                expanded={expandedAddManage.createFamilyUnit} 
+                onChange={(e, expanded) => setExpandedAddManage(prev => ({ ...prev, createFamilyUnit: expanded }))}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <FamilyRestroomIcon color="primary" />
+                    <Typography variant="subtitle1" fontWeight={600}>Create Family Unit</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Card variant="outlined">
+                    <CardHeader
+                      title="Create Family Unit"
+                      subheader="Create an entire family unit (parents + children) in one operation"
+                      avatar={<FamilyRestroomIcon />}
+                    />
+                    <Divider />
+                    <CardContent>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Quickly create a family unit by selecting parents and children. All relationships will be created automatically.
+            </Alert>
+            <Button
+              variant="contained"
+              size="large"
+              fullWidth
+              startIcon={<FamilyRestroomIcon />}
+              onClick={() => setBulkFamilyUnitOpen(true)}
+              disabled={persons.length < 2}
+            >
+              Create Family Unit
+            </Button>
+            {persons.length < 2 && (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                You need at least 2 people in the family to create a family unit.
+              </Typography>
+            )}
+                    </CardContent>
+                  </Card>
+                </AccordionDetails>
+              </Accordion>
+            )}
+
+            {/* Bulk Add Relationships Card */}
+            {isFamilyAdmin && (
+              <Accordion 
+                expanded={expandedAddManage.bulkRelationships} 
+                onChange={(e, expanded) => setExpandedAddManage(prev => ({ ...prev, bulkRelationships: expanded }))}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <AccountTreeIcon color="primary" />
+                    <Typography variant="subtitle1" fontWeight={600}>Bulk Add Relationships</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Card variant="outlined">
+                    <CardHeader
+                      title="Bulk Add Relationships"
+                      subheader="Add multiple family relationships at once (father, mother, sister, uncle, etc.)"
+                      avatar={<AccountTreeIcon />}
+                    />
+                    <Divider />
+                    <CardContent>
+                      <Alert severity="info" sx={{ mb: 2 }}>
+                        Quickly add multiple relationships for a person. Select a base person and add their relationships to other family members.
+                      </Alert>
+                      <Button
+                        variant="contained"
+                        size="large"
+                        fullWidth
+                        startIcon={<AccountTreeIcon />}
+                        onClick={() => setBulkRelationshipInputOpen(true)}
+                        disabled={persons.length < 2}
+                      >
+                        Bulk Add Relationships
+                      </Button>
+                      {persons.length < 2 && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                          You need at least 2 people in the family to create relationships.
+                        </Typography>
+                      )}
+                    </CardContent>
+                  </Card>
+                </AccordionDetails>
+              </Accordion>
+            )}
+
+            {/* Add Relationship Card */}
+            <Accordion 
+              expanded={expandedAddManage.addRelationship} 
+              onChange={(e, expanded) => setExpandedAddManage(prev => ({ ...prev, addRelationship: expanded }))}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Box display="flex" alignItems="center" gap={1}>
+                  <AddLinkIcon color="primary" />
+                  <Typography variant="subtitle1" fontWeight={600}>Add Relationship</Typography>
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Card variant="outlined">
+                  <CardHeader
+                    title="Add Relationship"
+                    subheader="Connect family members by creating relationships"
+                    avatar={<AddLinkIcon />}
+                    action={
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={showAdvancedMode ? <AutoAwesomeIcon /> : <SettingsIcon />}
+                        onClick={() => setShowAdvancedMode(!showAdvancedMode)}
+                        sx={{ mr: 1 }}
+                      >
+                        {showAdvancedMode ? 'Wizard Mode' : 'Advanced Mode'}
+                      </Button>
+                    }
+                  />
+                  <Divider />
+                  <CardContent>
+          {!showAdvancedMode ? (
+            <Box>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Use the wizard to add relationships with user-friendly labels like "father", "mother", "uncle", etc.
+              </Alert>
+              <Button
+                variant="contained"
+                size="large"
+                fullWidth
+                startIcon={<AutoAwesomeIcon />}
+                onClick={() => setWizardOpen(true)}
+                disabled={persons.length < 2}
+              >
+                Open Relationship Wizard
+              </Button>
+              {persons.length < 2 && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  You need at least 2 people in the family to create relationships.
+                </Typography>
+              )}
+            </Box>
+          ) : (
+            <>
+              {relationshipError && (
+                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setRelationshipError(null)}>
+                  {relationshipError}
+                </Alert>
+              )}
+              
+              {relationshipSuccess && (
+                <Alert severity="success" sx={{ mb: 2 }} onClose={() => setRelationshipSuccess(false)}>
+                  Relationship created successfully!
+                </Alert>
+              )}
+
+              <Stack spacing={2}>
+            <FormControl fullWidth>
+              <InputLabel id="from-person-label">From Person</InputLabel>
+              <Select
+                labelId="from-person-label"
+                id="from-person-select"
+                value={fromPersonId}
+                label="From Person"
+                onChange={(e) => {
+                  setFromPersonId(e.target.value);
+                  // Reset to person if same as from person
+                  if (e.target.value === toPersonId) {
+                    setToPersonId('');
+                  }
+                }}
+                disabled={submittingRelationship || persons.length === 0}
+              >
+                {persons.map((person) => (
+                  <MenuItem key={person.id} value={person.id}>
+                    {person.first_name} {person.last_name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel id="to-person-label">To Person</InputLabel>
+              <Select
+                labelId="to-person-label"
+                id="to-person-select"
+                value={toPersonId}
+                label="To Person"
+                onChange={(e) => setToPersonId(e.target.value)}
+                disabled={submittingRelationship || persons.length === 0 || !fromPersonId}
+              >
+                {persons
+                  .filter((person) => person.id !== parseInt(fromPersonId))
+                  .map((person) => (
+                    <MenuItem key={person.id} value={person.id}>
+                      {person.first_name} {person.last_name}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel id="relationship-type-label">Relationship Type</InputLabel>
+              <Select
+                labelId="relationship-type-label"
+                id="relationship-type-select"
+                value={relationshipType}
+                label="Relationship Type"
+                onChange={(e) => setRelationshipType(e.target.value)}
+                disabled={submittingRelationship}
+              >
+                <MenuItem value="PARENT_OF">
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <FamilyRestroomIcon fontSize="small" />
+                    <span>Parent Of</span>
+                  </Box>
+                </MenuItem>
+                <MenuItem value="SPOUSE_OF">
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <WcIcon fontSize="small" />
+                    <span>Spouse Of</span>
+                  </Box>
+                </MenuItem>
+              </Select>
+            </FormControl>
+
+            <Button
+              variant="contained"
+              onClick={handleAddRelationship}
+              disabled={submittingRelationship || !fromPersonId || !toPersonId || !relationshipType}
+              startIcon={submittingRelationship ? <CircularProgress size={20} /> : <AddLinkIcon />}
+            >
+              {submittingRelationship ? 'Adding...' : 'Add Relationship'}
+            </Button>
+              </Stack>
+            </>
+          )}
+                  </CardContent>
+                </Card>
+              </AccordionDetails>
+            </Accordion>
+
+            {/* Relationship Wizard */}
+      <RelationshipWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        familyId={activeFamilyId}
+        persons={persons}
+        topology={topology}
+        viewerPersonId={viewerPersonId}
+        currentUserPersonId={currentUserPersonId}
+        isAdmin={isFamilyAdmin}
+        onSuccess={async () => {
+          // Refetch topology after successful relationship creation
+          await fetchTopologyData();
+          // Refetch relationships list
+          const updatedRelationships = await getRelationships({ familyId: activeFamilyId });
+          setRelationships(updatedRelationships || []);
+        }}
+      />
+
+      {/* Bulk Family Unit Dialog */}
+      <BulkFamilyUnit
+        open={bulkFamilyUnitOpen}
+        onClose={() => setBulkFamilyUnitOpen(false)}
+        familyId={activeFamilyId}
+        persons={persons}
+        onSuccess={async () => {
+          // Refetch topology after successful family unit creation
+          await fetchTopologyData();
+          // Refetch relationships list
+          const updatedRelationships = await getRelationships({ familyId: activeFamilyId });
+          setRelationships(updatedRelationships || []);
+        }}
+      />
+
+      {/* Bulk Relationship Input Dialog */}
+      <BulkRelationshipInput
+        open={bulkRelationshipInputOpen}
+        onClose={() => setBulkRelationshipInputOpen(false)}
+        familyId={activeFamilyId}
+        persons={persons}
+        topology={topology}
+        viewerPersonId={viewerPersonId}
+        currentUserPersonId={currentUserPersonId}
+        onSuccess={async () => {
+          // Refetch topology after successful bulk relationship creation
+          await fetchTopologyData();
+          // Refetch relationships list
+          const updatedRelationships = await getRelationships({ familyId: activeFamilyId });
+          setRelationships(updatedRelationships || []);
+          // Refetch persons to ensure we have latest data
+          const updatedPersons = await getPersons({ familyId: activeFamilyId });
+          setPersons(updatedPersons || []);
+        }}
+      />
+
+      {/* Relationship Type Selector Dialog */}
+      <RelationshipTypeSelector
+        open={typeSelectorOpen}
+        onClose={() => {
+          setTypeSelectorOpen(false);
+          setEdgeFromPerson(null);
+          setEdgeToPerson(null);
+        }}
+        fromPerson={edgeFromPerson}
+        toPerson={edgeToPerson}
+        onConfirm={async (relationshipData) => {
+          try {
+            await createRelationship({
+              familyId: activeFamilyId,
+              fromPersonId: relationshipData.fromPersonId,
+              toPersonId: relationshipData.toPersonId,
+              type: relationshipData.type,
+            });
+            // Refetch topology after successful relationship creation
+            await fetchTopologyData();
+            // Refetch relationships list
+            const updatedRelationships = await getRelationships({ familyId: activeFamilyId });
+            setRelationships(updatedRelationships || []);
+            setTypeSelectorOpen(false);
+            setEdgeFromPerson(null);
+            setEdgeToPerson(null);
+          } catch (err) {
+            console.error('Error creating relationship:', err);
+            // Error will be shown in the dialog or we could add error state
+          }
+        }}
+      />
+
+            {/* Relationship Completion Suggestions Card */}
+            {isFamilyAdmin && (
+              <Accordion 
+                expanded={expandedAddManage.relationshipSuggestions} 
+                onChange={(e, expanded) => setExpandedAddManage(prev => ({ ...prev, relationshipSuggestions: expanded }))}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <AutoAwesomeIcon color="primary" />
+                    <Typography variant="subtitle1" fontWeight={600}>Relationship Suggestions</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Card variant="outlined">
+                    <CardHeader
+                      title="Relationship Suggestions"
+                      subheader="Find and add missing relationships"
+                      avatar={<AutoAwesomeIcon />}
+                      action={
+                        <IconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCompletionPanelOpen(!completionPanelOpen);
+                          }}
+                          aria-label="toggle completion panel"
+                        >
+                          {completionPanelOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                        </IconButton>
+                      }
+                    />
+                    <Collapse in={completionPanelOpen}>
+                      <Divider />
+                      <CardContent>
+              <Box sx={{ mb: 2 }}>
+                <Button
+                  variant="outlined"
+                  onClick={async () => {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:1032',message:'Analyze button clicked',data:{activeFamilyId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                    // #endregion
+                    if (!activeFamilyId) return;
+                    setLoadingCompletion(true);
+                    try {
+                      // #region agent log
+                      fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:1036',message:'Calling getRelationshipCompletion',data:{familyId:activeFamilyId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                      // #endregion
+                      const suggestions = await getRelationshipCompletion({ familyId: activeFamilyId });
+                      // #region agent log
+                      fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:1037',message:'getRelationshipCompletion success',data:{suggestionsCount:suggestions?.length||0,suggestions},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                      // #endregion
+                      setCompletionSuggestions(suggestions || []);
+                    } catch (err) {
+                      // #region agent log
+                      fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Topology:1039',message:'getRelationshipCompletion error',data:{error:err.message,errorStack:err.stack,response:err.response?.data,status:err.response?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                      // #endregion
+                      console.error('Error fetching completion suggestions:', err);
+                      setCompletionSuggestions([]);
+                    } finally {
+                      setLoadingCompletion(false);
+                    }
+                  }}
+                  disabled={loadingCompletion || !activeFamilyId}
+                  startIcon={loadingCompletion ? <CircularProgress size={16} /> : <AutoAwesomeIcon />}
+                >
+                  {loadingCompletion ? 'Analyzing...' : 'Analyze Missing Relationships'}
+                </Button>
+              </Box>
+
+              {completionSuggestions.length > 0 ? (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Found {completionSuggestions.length} suggestion(s):
+                  </Typography>
+                  <List dense>
+                    {completionSuggestions.map((suggestion, index) => {
+                      const fromPerson = persons.find(p => p.id === suggestion.from_person_id);
+                      const toPerson = persons.find(p => p.id === suggestion.to_person_id);
+                      const getPersonName = (person) => {
+                        if (!person) return `Person ${suggestion.from_person_id || suggestion.to_person_id}`;
+                        return `${person.first_name || ''} ${person.last_name || ''}`.trim() || `Person ${person.id}`;
+                      };
+                      return (
+                        <ListItem key={index}>
+                          <ListItemText
+                            primary={
+                              <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                                <Typography variant="body2">
+                                  {getPersonName(fromPerson)}
+                                </Typography>
+                                <ArrowForwardIcon fontSize="small" />
+                                <Typography variant="body2">
+                                  {getPersonName(toPerson)}
+                                </Typography>
+                                <Chip
+                                  label={suggestion.relationship_type.replace('_', ' ')}
+                                  size="small"
+                                  color="primary"
+                                />
+                              </Box>
+                            }
+                            secondary={
+                              <Typography variant="body2" color="text.secondary">
+                                {suggestion.reason}
+                              </Typography>
+                            }
+                          />
+                          <ListItemSecondaryAction>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={async () => {
+                                try {
+                                  await createRelationship({
+                                    familyId: activeFamilyId,
+                                    fromPersonId: suggestion.from_person_id,
+                                    toPersonId: suggestion.to_person_id,
+                                    type: suggestion.relationship_type,
+                                  });
+                                  // Remove from suggestions list
+                                  setCompletionSuggestions(prev => prev.filter((_, i) => i !== index));
+                                  // Refresh topology
+                                  await fetchTopologyData();
+                                } catch (err) {
+                                  console.error('Error creating suggested relationship:', err);
+                                }
+                              }}
+                            >
+                              Add
+                            </Button>
+                          </ListItemSecondaryAction>
+                        </ListItem>
+                      );
+                    })}
+                  </List>
+                </Box>
+              ) : loadingCompletion ? (
+                <Box display="flex" justifyContent="center" p={2}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : (
+                <Alert severity="info">
+                  Click "Analyze Missing Relationships" to find relationship suggestions.
+                </Alert>
+              )}
+                      </CardContent>
+                    </Collapse>
+                  </Card>
+                </AccordionDetails>
+              </Accordion>
+            )}
+
+            {/* Manage Relationships Card - Admin Only */}
+            {isFamilyAdmin && (
+              <Accordion 
+                expanded={expandedAddManage.manageRelationships} 
+                onChange={(e, expanded) => setExpandedAddManage(prev => ({ ...prev, manageRelationships: expanded }))}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <AccountTreeIcon color="primary" />
+                    <Typography variant="subtitle1" fontWeight={600}>Manage Relationships</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Card variant="outlined">
+                    <CardHeader
+                      title="Manage Relationships"
+                      subheader="View and delete relationships"
+                      avatar={<AccountTreeIcon />}
+                    />
+                    <Divider />
+                    <CardContent>
+                      {loadingRelationships ? (
+                        <Box display="flex" justifyContent="center" p={4}>
+                          <CircularProgress />
+                        </Box>
+                      ) : relationships.length > 0 ? (
+                        <TableContainer component={Paper} variant="outlined">
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>From Person</TableCell>
+                                <TableCell>Type</TableCell>
+                                <TableCell>To Person</TableCell>
+                                <TableCell>Created</TableCell>
+                                <TableCell align="right">Actions</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {relationships.map((rel) => (
+                                <TableRow key={rel.id} hover>
+                                  <TableCell>
+                                    {rel.from_person ? `${rel.from_person.first_name} ${rel.from_person.last_name}` : `Person ${rel.from_person_id}`}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Chip
+                                      label={rel.type.replace('_', ' ')}
+                                      size="small"
+                                      color={rel.type === 'PARENT_OF' ? 'primary' : 'secondary'}
+                                      icon={rel.type === 'PARENT_OF' ? <FamilyRestroomIcon /> : <WcIcon />}
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    {rel.to_person ? `${rel.to_person.first_name} ${rel.to_person.last_name}` : `Person ${rel.to_person_id}`}
+                                  </TableCell>
+                                  <TableCell>
+                                    {rel.created_at ? new Date(rel.created_at).toLocaleDateString() : 'N/A'}
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => handleDeleteClick(rel)}
+                                      aria-label="delete relationship"
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      ) : (
+                        <Box textAlign="center" py={4}>
+                          <AccountTreeIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+                          <Typography variant="body2" color="text.secondary">
+                            No relationships yet.
+                          </Typography>
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+              </AccordionDetails>
+            </Accordion>
+            )}
+          </Stack>
+        </AccordionDetails>
+      </Accordion>
+
+      {/* Relationships List */}
+      <Accordion 
+        expanded={expandedSections.relationshipsList} 
+        onChange={(e, expanded) => setExpandedSections(prev => ({ ...prev, relationshipsList: expanded }))}
+        sx={{ mb: 2 }}
+      >
+        <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
+          <Box display="flex" alignItems="center" gap={1}>
+            <AccountTreeIcon color="primary" />
+            <Typography variant="h6">
+              Relationships List ({topology?.edges?.length || 0})
+            </Typography>
+          </Box>
+        </AccordionSummary>
+        <AccordionDetails sx={{ pt: 2 }}>
           {loadingTopology ? (
             <Box display="flex" justifyContent="center" p={4}>
               <CircularProgress />
@@ -1519,8 +1656,63 @@ const Topology = () => {
               </Typography>
             </Box>
           )}
-        </CardContent>
-      </Card>
+        </AccordionDetails>
+      </Accordion>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete Relationship</DialogTitle>
+        <DialogContent>
+          {deleteError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDeleteError(null)}>
+              {deleteError}
+            </Alert>
+          )}
+          {relationshipToDelete && (
+            <Box>
+              <Typography variant="body1" gutterBottom>
+                Are you sure you want to delete this relationship?
+              </Typography>
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  <strong>From:</strong>{' '}
+                  {relationshipToDelete.from_person
+                    ? `${relationshipToDelete.from_person.first_name} ${relationshipToDelete.from_person.last_name}`
+                    : `Person ${relationshipToDelete.from_person_id}`}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  <strong>Type:</strong> {relationshipToDelete.type.replace('_', ' ')}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  <strong>To:</strong>{' '}
+                  {relationshipToDelete.to_person
+                    ? `${relationshipToDelete.to_person.first_name} ${relationshipToDelete.to_person.last_name}`
+                    : `Person ${relationshipToDelete.to_person_id}`}
+                </Typography>
+                {relationshipToDelete.type === 'SPOUSE_OF' && (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    This will delete both directions of the spouse relationship.
+                  </Alert>
+                )}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={deletingRelationship}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            color="error"
+            variant="contained"
+            disabled={deletingRelationship}
+            startIcon={deletingRelationship ? <CircularProgress size={20} /> : <DeleteIcon />}
+          >
+            {deletingRelationship ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -124,7 +124,7 @@ const PendingApproval = () => {
           py: 4,
         }}
       >
-        <Paper elevation={3} sx={{ p: 4 }}>
+        <Paper elevation={0} sx={{ p: 4, borderRadius: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h4" component="h1">
               Join Request Status

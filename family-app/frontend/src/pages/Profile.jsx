@@ -263,13 +263,13 @@ const Profile = () => {
 
   return (
     <Container maxWidth="md">
-      <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 4 }}>
+      <Typography variant="h3" component="h1" gutterBottom sx={{ mb: 4 }}>
         Profile
       </Typography>
 
       {/* My Posts Section */}
       {myPersonId && (
-        <Card elevation={2} sx={{ mb: 4 }}>
+        <Card elevation={0} sx={{ mb: 4 }}>
           <CardContent>
             <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
               <Typography variant="h5" component="h2">

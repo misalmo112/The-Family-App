@@ -95,12 +95,14 @@ const Families = () => {
 
   return (
     <Box>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Families
-      </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        Select a family to view its feed and topology
-      </Typography>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h3" component="h1" gutterBottom>
+          Your Families
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Choose a family space to enter the chat and timeline.
+        </Typography>
+      </Box>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {families.map((family) => (
           <Card
@@ -130,7 +132,7 @@ const Families = () => {
                   </Typography>
                 )}
               </Typography>
-              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 2 }, mt: 1 }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 1 }}>
                 <Typography variant="body2" color="text.secondary">
                   Code: <strong>{family.code}</strong>
                 </Typography>

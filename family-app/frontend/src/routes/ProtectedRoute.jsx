@@ -16,7 +16,7 @@ const ProtectedRoute = ({ children }) => {
   const onboardingRoutes = ['/onboarding', '/pending'];
 
   // Routes that require an active family
-  const familyRequiredRoutes = ['/feed', '/topology', '/post'];
+  const familyRequiredRoutes = ['/feed', '/topology'];
 
   useEffect(() => {
     const checkFamilies = async () => {
