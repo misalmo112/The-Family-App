@@ -6,6 +6,7 @@ app_name = 'graph'
 urlpatterns = [
     path('persons/', PersonView.as_view(), name='person-list-create'),
     path('topology/', TopologyView.as_view(), name='topology'),
-    path('relationships/', RelationshipView.as_view(), name='relationship-create'),
+    path('relationships/', RelationshipView.as_view(), name='relationship-list-create'),
+    path('relationships/<int:pk>/', RelationshipView.as_view(), name='relationship-delete'),
 ]
 

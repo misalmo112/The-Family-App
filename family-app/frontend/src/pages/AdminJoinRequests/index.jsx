@@ -10,12 +10,17 @@ import {
   Snackbar,
   Chip,
   Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   getJoinRequests,
   approveJoinRequest,
   rejectJoinRequest,
 } from '../../services/families';
+import { getPersons } from '../../services/graph';
 
 const AdminJoinRequests = () => {
   const [requests, setRequests] = useState([]);
@@ -23,10 +28,36 @@ const AdminJoinRequests = () => {
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState({});
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [familyPersons, setFamilyPersons] = useState({}); // { familyId: [persons] }
+  const [loadingPersons, setLoadingPersons] = useState({}); // { familyId: true/false }
+  const [selectedPersonIds, setSelectedPersonIds] = useState({}); // { requestId: personId }
 
   useEffect(() => {
     fetchRequests();
   }, []);
+
+  const fetchPersonsForFamily = async (familyId) => {
+    // Skip if already fetched or currently loading
+    if (familyPersons[familyId] || loadingPersons[familyId]) {
+      return;
+    }
+
+    try {
+      setLoadingPersons((prev) => ({ ...prev, [familyId]: true }));
+      const persons = await getPersons({ familyId });
+      // Filter to only include persons without user accounts
+      const availablePersons = (persons || []).filter(
+        (person) => person.has_user_account === false
+      );
+      setFamilyPersons((prev) => ({ ...prev, [familyId]: availablePersons }));
+    } catch (err) {
+      console.error(`Error fetching persons for family ${familyId}:`, err);
+      // Set empty array on error so we don't retry
+      setFamilyPersons((prev) => ({ ...prev, [familyId]: [] }));
+    } finally {
+      setLoadingPersons((prev) => ({ ...prev, [familyId]: false }));
+    }
+  };
 
   const fetchRequests = async () => {
     try {
@@ -36,6 +67,14 @@ const AdminJoinRequests = () => {
       console.log('[DEBUG] Fetched join requests:', data);
       console.log('[DEBUG] Request IDs and types:', data?.map(r => ({ id: r.id, type: typeof r.id })));
       setRequests(data || []);
+      
+      // Fetch persons for each unique family
+      if (data && data.length > 0) {
+        const uniqueFamilyIds = [...new Set(data.map(req => req.family?.id).filter(Boolean))];
+        uniqueFamilyIds.forEach(familyId => {
+          fetchPersonsForFamily(familyId);
+        });
+      }
     } catch (err) {
       console.error('Error fetching join requests:', err);
       if (err.response) {
@@ -70,7 +109,9 @@ const AdminJoinRequests = () => {
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdminJoinRequests/index.jsx:64',message:'Before approveJoinRequest API call',data:{id,apiUrl:`/api/families/join-requests/${id}/approve/`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
-      const result = await approveJoinRequest(id);
+      // Get selected person_id for this request (null if not selected)
+      const personId = selectedPersonIds[id] || null;
+      const result = await approveJoinRequest(id, personId);
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdminJoinRequests/index.jsx:68',message:'approveJoinRequest API call succeeded',data:{id,result:JSON.stringify(result)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       console.log('[DEBUG] approveJoinRequest succeeded:', result);
@@ -95,6 +136,12 @@ const AdminJoinRequests = () => {
         console.log('[DEBUG] After filter - removed id:', id, 'remaining count:', filtered.length);
         // #endregion
         return filtered;
+      });
+      // Clear selected person_id for this request
+      setSelectedPersonIds((prev) => {
+        const updated = { ...prev };
+        delete updated[id];
+        return updated;
       });
       setSnackbar({
         open: true,
@@ -324,6 +371,71 @@ const AdminJoinRequests = () => {
                   </Typography>
                 )}
               </Box>
+
+              {/* Link to Existing Person Selection */}
+              {request.family?.id && (() => {
+                const familyId = request.family.id;
+                const availablePersons = familyPersons[familyId] || [];
+                const isLoading = loadingPersons[familyId] === true;
+                const hasAvailablePersons = availablePersons.length > 0;
+                
+                if (isLoading) {
+                  return (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Loading available persons...
+                      </Typography>
+                      <CircularProgress size={20} />
+                    </Box>
+                  );
+                }
+                
+                if (!hasAvailablePersons) {
+                  return null; // Don't show dropdown if no available persons
+                }
+                
+                return (
+                  <Box sx={{ mb: 2 }}>
+                    <FormControl fullWidth>
+                      <InputLabel id={`person-select-label-${request.id}`}>
+                        Link to existing person (optional)
+                      </InputLabel>
+                      <Select
+                        labelId={`person-select-label-${request.id}`}
+                        id={`person-select-${request.id}`}
+                        value={selectedPersonIds[request.id] || ''}
+                        label="Link to existing person (optional)"
+                        onChange={(e) => {
+                          const personId = e.target.value === '' ? null : e.target.value;
+                          setSelectedPersonIds((prev) => ({
+                            ...prev,
+                            [request.id]: personId,
+                          }));
+                        }}
+                        disabled={actionLoading[String(request.id)] !== null && actionLoading[String(request.id)] !== undefined}
+                      >
+                        <MenuItem value="">
+                          <em>Create new person</em>
+                        </MenuItem>
+                        {availablePersons.map((person) => (
+                          <MenuItem key={person.id} value={person.id}>
+                            {person.first_name} {person.last_name}
+                            {person.dob && ` (${new Date(person.dob).getFullYear()})`}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    {selectedPersonIds[request.id] && (
+                      <Chip
+                        label={`Will link to: ${availablePersons.find(p => p.id === selectedPersonIds[request.id])?.first_name} ${availablePersons.find(p => p.id === selectedPersonIds[request.id])?.last_name}`}
+                        color="primary"
+                        size="small"
+                        sx={{ mt: 1 }}
+                      />
+                    )}
+                  </Box>
+                );
+              })()}
 
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
                 <Button

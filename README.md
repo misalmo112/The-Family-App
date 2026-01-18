@@ -153,9 +153,21 @@ Follow the prompts to set a username, email, and password.
 
 Start the Django development server:
 
+**Windows (Recommended):**
+```powershell
+# Use the provided PowerShell script to avoid autoreloader issues
+.\start_server.ps1
+
+# Or manually with --noreload flag:
+python manage.py runserver 127.0.0.1:8000 --noreload
+```
+
+**macOS/Linux:**
 ```bash
 python manage.py runserver
 ```
+
+**Note for Windows users:** If the server hangs after "System check identified no issues", this is a known Windows issue with Django's autoreloader. Use the `--noreload` flag or the `start_server.ps1` script. With `--noreload`, you'll need to manually restart the server after code changes.
 
 The server will be available at `http://127.0.0.1:8000/`
 

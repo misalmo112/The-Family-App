@@ -5,9 +5,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
-from apps.graph.models import Person, RelationshipTypeChoices
+from apps.graph.models import Person, Relationship, RelationshipTypeChoices
 from apps.graph.serializers import PersonSerializer, RelationshipSerializer
-from apps.graph.services.relationship_service import add_parent, add_spouse
+from apps.graph.services.relationship_service import add_parent, add_spouse, delete_relationship
 
 
 def is_family_admin(user, family):
@@ -91,8 +91,39 @@ class PersonView(APIView):
 
 
 class RelationshipView(APIView):
-    """Create relationships between persons (ADMIN of family only)"""
+    """Create, list, and delete relationships between persons (ADMIN of family only for create/delete)"""
     permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """List relationships for a family (member of that family)"""
+        family_id = request.query_params.get('family_id')
+        if not family_id:
+            return Response(
+                {'error': 'family_id query parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get family object
+        try:
+            from apps.families.models import Family
+            family = get_object_or_404(Family, id=family_id)
+        except:
+            return Response(
+                {'error': 'Family not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if user is a member of that family
+        if not is_family_member(request.user, family):
+            return Response(
+                {'error': 'You must be a member of this family to view relationships'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Filter relationships by family
+        relationships = Relationship.objects.filter(family=family).select_related('from_person', 'to_person')
+        serializer = RelationshipSerializer(relationships, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
         """Create a new relationship"""
@@ -136,6 +167,63 @@ class RelationshipView(APIView):
                     {'error': f'Unsupported relationship type: {relationship_type}'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+        except ValidationError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def delete(self, request, pk=None):
+        """Delete a relationship (ADMIN of family only)"""
+        # Get relationship ID from URL parameter or request body
+        relationship_id = pk or request.data.get('id')
+        if not relationship_id:
+            return Response(
+                {'error': 'Relationship ID is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get relationship
+        try:
+            relationship = get_object_or_404(Relationship, id=relationship_id)
+        except:
+            return Response(
+                {'error': 'Relationship not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if user is ADMIN of that family
+        if not is_family_admin(request.user, relationship.family):
+            return Response(
+                {'error': 'Only family admins can delete relationships'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Delete the relationship(s)
+        try:
+            deleted_relationships = delete_relationship(relationship)
+            
+            # Optional: Create audit log entry
+            try:
+                from apps.admin_panel.services.audit import log_action
+                log_action(
+                    actor_user=request.user,
+                    action_type='RELATIONSHIP_DELETE',
+                    entity_type='Relationship',
+                    entity_id=str(relationship_id),
+                    family_id=relationship.family.id,
+                    before={
+                        'from_person_id': relationship.from_person.id,
+                        'to_person_id': relationship.to_person.id,
+                        'type': relationship.type
+                    },
+                    after=None
+                )
+            except ImportError:
+                # Audit service not available, continue without logging
+                pass
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except ValidationError as e:
             return Response(
                 {'error': str(e)},

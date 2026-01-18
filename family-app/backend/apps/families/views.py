@@ -112,10 +112,14 @@ class JoinRequestApproveView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
+        # Extract optional person_id from request body
+        person_id = request.data.get('person_id')
+        
         try:
             membership = approve_join_request(
                 join_request_id=pk,
-                reviewer=request.user
+                reviewer=request.user,
+                person_id=person_id
             )
             return Response(
                 {

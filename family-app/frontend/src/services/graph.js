@@ -33,6 +33,27 @@ export const getTopology = async ({ familyId, viewerPersonId }) => {
 };
 
 /**
+ * Create a new person in a family (admin only)
+ * @param {Object} params - Person parameters
+ * @param {number} params.familyId - The family ID
+ * @param {string} params.firstName - First name
+ * @param {string} params.lastName - Last name
+ * @param {string} params.dob - Date of birth (optional, format: YYYY-MM-DD)
+ * @param {string} params.gender - Gender (MALE, FEMALE, OTHER, UNKNOWN)
+ * @returns {Promise<Object>} Created person object
+ */
+export const createPerson = async ({ familyId, firstName, lastName, dob, gender }) => {
+  const response = await api.post('/api/graph/persons/', {
+    family_id: familyId,
+    first_name: firstName,
+    last_name: lastName,
+    dob: dob || null,
+    gender: gender || 'UNKNOWN',
+  });
+  return response.data;
+};
+
+/**
  * Create a relationship between two persons
  * @param {Object} params - Relationship parameters
  * @param {number} params.familyId - The family ID
@@ -48,6 +69,31 @@ export const createRelationship = async ({ familyId, fromPersonId, toPersonId, t
     to_person_id: toPersonId,
     type: type,  // 'PARENT_OF' or 'SPOUSE_OF'
   });
+  return response.data;
+};
+
+/**
+ * Get all relationships for a family
+ * @param {Object} params - Query parameters
+ * @param {number} params.familyId - The family ID
+ * @returns {Promise<Array>} Array of relationship objects
+ */
+export const getRelationships = async ({ familyId }) => {
+  const response = await api.get('/api/graph/relationships/', {
+    params: {
+      family_id: familyId,
+    },
+  });
+  return response.data;
+};
+
+/**
+ * Delete a relationship
+ * @param {number} relationshipId - The relationship ID to delete
+ * @returns {Promise<void>}
+ */
+export const deleteRelationship = async (relationshipId) => {
+  const response = await api.delete(`/api/graph/relationships/${relationshipId}/`);
   return response.data;
 };
 

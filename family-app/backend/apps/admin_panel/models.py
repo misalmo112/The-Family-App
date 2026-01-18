@@ -96,11 +96,10 @@ class Feedback(models.Model):
 
 class AdminFamilyFlag(models.Model):
     """Admin flags for families (e.g., suspension)"""
-    family = models.ForeignKey(
+    family = models.OneToOneField(
         'families.Family',
         on_delete=models.CASCADE,
-        related_name='admin_flags',
-        unique=True
+        related_name='admin_flags'
     )
     suspended = models.BooleanField(default=False)
     reason = models.TextField(blank=True)

@@ -114,13 +114,14 @@ def create_join_request(family_code, user, chosen_person_id=None, new_person_pay
     return join_request
 
 
-def approve_join_request(join_request_id, reviewer):
+def approve_join_request(join_request_id, reviewer, person_id=None):
     """
     Approve a join request and create membership.
     
     Args:
         join_request_id: ID of JoinRequest to approve
         reviewer: User instance approving the request
+        person_id: Optional ID of existing Person to link to (admin override)
         
     Returns:
         FamilyMembership instance
@@ -152,9 +153,33 @@ def approve_join_request(join_request_id, reviewer):
     
     with transaction.atomic():
         # Determine which Person to use
-        if join_request.chosen_person:
+        # Priority: 1) admin-specified person_id, 2) chosen_person from request, 3) create new
+        person = None
+        
+        if person_id:
+            # Admin is specifying which Person to link to
+            try:
+                person = Person.objects.get(pk=person_id)
+            except Person.DoesNotExist:
+                raise ValidationError(f"Person with id '{person_id}' does not exist.")
+            
+            # Validate person belongs to the family
+            if person.family_id != join_request.family_id:
+                raise ValidationError("Specified person does not belong to this family.")
+            
+            # Check if person is already linked to a user account
+            if FamilyMembership.objects.filter(person=person, family=join_request.family).exists():
+                raise ValidationError("This person is already linked to a user account.")
+                
+        elif join_request.chosen_person:
+            # User specified a Person in their join request
             if join_request.chosen_person.family_id != join_request.family_id:
                 raise ValidationError("Chosen person does not belong to this family.")
+            
+            # Check if person is already linked to a user account
+            if FamilyMembership.objects.filter(person=join_request.chosen_person, family=join_request.family).exists():
+                raise ValidationError("Chosen person is already linked to a user account.")
+            
             person = join_request.chosen_person
         else:
             # Create new Person from payload or User profile defaults

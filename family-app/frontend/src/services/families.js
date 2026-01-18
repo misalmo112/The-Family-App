@@ -63,14 +63,19 @@ export const getJoinRequests = async () => {
 /**
  * Approve a join request
  * @param {number} id - Join request ID
+ * @param {number|null} personId - Optional person ID to link to existing person
  * @returns {Promise<Object>} Response object with message and membership_id
  */
-export const approveJoinRequest = async (id) => {
+export const approveJoinRequest = async (id, personId = null) => {
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'services/families.js:77',message:'approveJoinRequest service called',data:{id,idType:typeof id,url:`/api/families/join-requests/${id}/approve/`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'services/families.js:77',message:'approveJoinRequest service called',data:{id,idType:typeof id,personId,url:`/api/families/join-requests/${id}/approve/`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
   // #endregion
   try {
-    const response = await api.post(`/api/families/join-requests/${id}/approve/`);
+    const payload = {};
+    if (personId !== null && personId !== undefined) {
+      payload.person_id = personId;
+    }
+    const response = await api.post(`/api/families/join-requests/${id}/approve/`, payload);
     // #region agent log
     fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'services/families.js:81',message:'approveJoinRequest API response received',data:{id,status:response.status,statusText:response.statusText,data:JSON.stringify(response.data)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion

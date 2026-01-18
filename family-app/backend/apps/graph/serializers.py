@@ -8,11 +8,20 @@ class PersonSerializer(serializers.ModelSerializer):
     """Serializer for Person model"""
     family_id = serializers.IntegerField(write_only=True, required=False)
     relation_to_viewer = serializers.CharField(read_only=True, required=False)
+    has_user_account = serializers.SerializerMethodField(read_only=True)
     
     class Meta:
         model = Person
-        fields = ['id', 'family', 'family_id', 'first_name', 'last_name', 'dob', 'gender', 'created_at', 'updated_at', 'relation_to_viewer']
-        read_only_fields = ['id', 'family', 'created_at', 'updated_at', 'relation_to_viewer']
+        fields = ['id', 'family', 'family_id', 'first_name', 'last_name', 'dob', 'gender', 'created_at', 'updated_at', 'relation_to_viewer', 'has_user_account']
+        read_only_fields = ['id', 'family', 'created_at', 'updated_at', 'relation_to_viewer', 'has_user_account']
+    
+    def get_has_user_account(self, obj):
+        """Check if Person has an active FamilyMembership (linked to a user account)"""
+        from apps.families.models import FamilyMembership
+        return FamilyMembership.objects.filter(
+            person=obj,
+            status=FamilyMembership.Status.ACTIVE
+        ).exists()
     
     def validate(self, attrs):
         """Handle family_id to family conversion"""
@@ -43,6 +52,7 @@ class PersonSerializer(serializers.ModelSerializer):
                 ret['relation_to_viewer'] = self.context['relation_to_viewer']
             elif hasattr(instance, 'relation_to_viewer'):
                 ret['relation_to_viewer'] = instance.relation_to_viewer
+            # has_user_account is computed via SerializerMethodField, so it's already included
             return ret
 
 
@@ -52,11 +62,13 @@ class RelationshipSerializer(serializers.ModelSerializer):
     from_person_id = serializers.IntegerField(write_only=True)
     to_person_id = serializers.IntegerField(write_only=True)
     type = serializers.ChoiceField(choices=RelationshipTypeChoices.choices)
+    from_person = PersonSerializer(read_only=True)
+    to_person = PersonSerializer(read_only=True)
     
     class Meta:
         model = Relationship
-        fields = ['id', 'family_id', 'type', 'from_person_id', 'to_person_id', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        fields = ['id', 'family_id', 'type', 'from_person_id', 'to_person_id', 'from_person', 'to_person', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'from_person', 'to_person']
     
     def validate(self, attrs):
         """Validate that persons exist and belong to the family"""

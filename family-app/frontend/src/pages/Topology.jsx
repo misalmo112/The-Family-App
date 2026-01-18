@@ -26,9 +26,23 @@ import {
   Switch,
   FormControlLabel,
   Collapse,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
 } from '@mui/material';
 import {
   Person as PersonIcon,
+  PersonAdd as PersonAddIcon,
   AccountTree as AccountTreeIcon,
   AddLink as AddLinkIcon,
   ArrowForward as ArrowForwardIcon,
@@ -40,9 +54,10 @@ import {
   ViewList as ViewListIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useFamily } from '../context/FamilyContext';
-import { getPersons, getTopology, createRelationship, getCurrentUserPersonId } from '../services/graph';
+import { getPersons, getTopology, createRelationship, createPerson, getCurrentUserPersonId, getRelationships, deleteRelationship } from '../services/graph';
 import { checkIsFamilyAdmin } from '../services/families';
 import RelationshipWizard from '../components/RelationshipWizard';
 import FamilyGraph from '../components/FamilyGraph';
@@ -100,6 +115,23 @@ const Topology = () => {
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
   const [showAdvancedMode, setShowAdvancedMode] = useState(false);
+  
+  // Create Person form state
+  const [personFirstName, setPersonFirstName] = useState('');
+  const [personLastName, setPersonLastName] = useState('');
+  const [personDob, setPersonDob] = useState('');
+  const [personGender, setPersonGender] = useState('UNKNOWN');
+  const [creatingPerson, setCreatingPerson] = useState(false);
+  const [personError, setPersonError] = useState(null);
+  const [personSuccess, setPersonSuccess] = useState(false);
+  
+  // Relationship management state
+  const [relationships, setRelationships] = useState([]);
+  const [loadingRelationships, setLoadingRelationships] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [relationshipToDelete, setRelationshipToDelete] = useState(null);
+  const [deletingRelationship, setDeletingRelationship] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   // Fetch user data (person ID and admin status) when activeFamilyId changes
   useEffect(() => {
@@ -217,6 +249,32 @@ const Topology = () => {
     fetchTopologyData();
   }, [fetchTopologyData]);
 
+  // Fetch relationships when activeFamilyId changes (for admins)
+  useEffect(() => {
+    if (!activeFamilyId) {
+      setRelationships([]);
+      return;
+    }
+
+    const fetchRelationships = async () => {
+      try {
+        setLoadingRelationships(true);
+        const data = await getRelationships({ familyId: activeFamilyId });
+        setRelationships(data || []);
+      } catch (err) {
+        console.error('Error fetching relationships:', err);
+        // Don't show error for non-admins, they just won't see the list
+        if (err.response?.status !== 403) {
+          setError(err.response?.data?.error || 'Failed to load relationships');
+        }
+      } finally {
+        setLoadingRelationships(false);
+      }
+    };
+
+    fetchRelationships();
+  }, [activeFamilyId]);
+
   // Build person map for edge name lookup
   const personMap = new Map();
   if (topology?.nodes) {
@@ -292,6 +350,97 @@ const Topology = () => {
     return { immediate, extended, inlaws };
   };
 
+  // Handle create person form submission
+  const handleCreatePerson = async () => {
+    // Validation
+    if (!personFirstName.trim()) {
+      setPersonError('First name is required.');
+      return;
+    }
+    if (!personLastName.trim()) {
+      setPersonError('Last name is required.');
+      return;
+    }
+    if (!personGender) {
+      setPersonError('Gender is required.');
+      return;
+    }
+
+    // Validate date if provided
+    if (personDob) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(personDob)) {
+        setPersonError('Date of birth must be in YYYY-MM-DD format.');
+        return;
+      }
+      const date = new Date(personDob);
+      if (isNaN(date.getTime())) {
+        setPersonError('Invalid date of birth.');
+        return;
+      }
+    }
+
+    try {
+      setCreatingPerson(true);
+      setPersonError(null);
+      setPersonSuccess(false);
+
+      await createPerson({
+        familyId: activeFamilyId,
+        firstName: personFirstName.trim(),
+        lastName: personLastName.trim(),
+        dob: personDob || null,
+        gender: personGender,
+      });
+
+      // Reset form
+      setPersonFirstName('');
+      setPersonLastName('');
+      setPersonDob('');
+      setPersonGender('UNKNOWN');
+      setPersonSuccess(true);
+
+      // Refetch persons and topology to show the new person
+      const updatedPersons = await getPersons({ familyId: activeFamilyId });
+      setPersons(updatedPersons || []);
+      
+      // Refresh topology if viewerPersonId is set
+      if (viewerPersonId) {
+        await fetchTopologyData();
+      }
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setPersonSuccess(false), 3000);
+    } catch (err) {
+      console.error('Error creating person:', err);
+      if (err.response) {
+        if (err.response.status === 403) {
+          setPersonError('Only family admins can create persons.');
+        } else {
+          const errorData = err.response.data;
+          if (typeof errorData === 'object' && errorData !== null) {
+            // Handle field-specific errors
+            const errorMessages = Object.entries(errorData)
+              .map(([key, value]) => {
+                if (Array.isArray(value)) {
+                  return `${key}: ${value.join(', ')}`;
+                }
+                return `${key}: ${value}`;
+              })
+              .join('; ');
+            setPersonError(errorMessages || 'Failed to create person. Please try again.');
+          } else {
+            setPersonError(err.response.data?.error || 'Failed to create person. Please try again.');
+          }
+        }
+      } else {
+        setPersonError('Network error. Please check your connection.');
+      }
+    } finally {
+      setCreatingPerson(false);
+    }
+  };
+
   // Handle relationship form submission
   const handleAddRelationship = async () => {
     if (!fromPersonId || !toPersonId || !relationshipType) {
@@ -325,6 +474,10 @@ const Topology = () => {
       // Refetch topology to show the new relationship
       await fetchTopologyData();
 
+      // Refetch relationships list
+      const updatedRelationships = await getRelationships({ familyId: activeFamilyId });
+      setRelationships(updatedRelationships || []);
+
       // Clear success message after 3 seconds
       setTimeout(() => setRelationshipSuccess(false), 3000);
     } catch (err) {
@@ -343,6 +496,54 @@ const Topology = () => {
     } finally {
       setSubmittingRelationship(false);
     }
+  };
+
+  // Handle delete relationship
+  const handleDeleteClick = (relationship) => {
+    setRelationshipToDelete(relationship);
+    setDeleteDialogOpen(true);
+    setDeleteError(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!relationshipToDelete) return;
+
+    try {
+      setDeletingRelationship(true);
+      setDeleteError(null);
+
+      await deleteRelationship(relationshipToDelete.id);
+
+      // Close dialog
+      setDeleteDialogOpen(false);
+      setRelationshipToDelete(null);
+
+      // Refetch relationships list
+      const updatedRelationships = await getRelationships({ familyId: activeFamilyId });
+      setRelationships(updatedRelationships || []);
+
+      // Refetch topology to reflect changes
+      await fetchTopologyData();
+    } catch (err) {
+      console.error('Error deleting relationship:', err);
+      if (err.response) {
+        if (err.response.status === 403) {
+          setDeleteError('Only family admins can delete relationships.');
+        } else {
+          setDeleteError(err.response.data?.error || 'Failed to delete relationship. Please try again.');
+        }
+      } else {
+        setDeleteError('Network error. Please check your connection.');
+      }
+    } finally {
+      setDeletingRelationship(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setRelationshipToDelete(null);
+    setDeleteError(null);
   };
 
   if (!activeFamilyId) {
@@ -435,6 +636,112 @@ const Topology = () => {
           </ToggleButton>
         </ToggleButtonGroup>
       </Box>
+
+      {/* Add Person Card - Admin Only */}
+      {isFamilyAdmin && (
+        <Card sx={{ mb: 3 }}>
+          <CardHeader
+            title="Add Family Member"
+            subheader="Create a new person in the family topology (no user account required)"
+            avatar={<PersonAddIcon />}
+          />
+          <CardContent>
+            {personError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setPersonError(null)}>
+                {personError}
+              </Alert>
+            )}
+            
+            {personSuccess && (
+              <Alert severity="success" sx={{ mb: 2 }} onClose={() => setPersonSuccess(false)}>
+                Person created successfully! They will appear in the family members list.
+              </Alert>
+            )}
+
+            <Stack spacing={2}>
+              <TextField
+                fullWidth
+                label="First Name"
+                value={personFirstName}
+                onChange={(e) => setPersonFirstName(e.target.value)}
+                required
+                disabled={creatingPerson}
+                error={personError && !personFirstName.trim()}
+              />
+
+              <TextField
+                fullWidth
+                label="Last Name"
+                value={personLastName}
+                onChange={(e) => setPersonLastName(e.target.value)}
+                required
+                disabled={creatingPerson}
+                error={personError && !personLastName.trim()}
+              />
+
+              <TextField
+                fullWidth
+                label="Date of Birth"
+                type="date"
+                value={personDob}
+                onChange={(e) => setPersonDob(e.target.value)}
+                disabled={creatingPerson}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                helperText="Optional - Format: YYYY-MM-DD"
+              />
+
+              <FormControl fullWidth required>
+                <InputLabel id="person-gender-label">Gender</InputLabel>
+                <Select
+                  labelId="person-gender-label"
+                  id="person-gender-select"
+                  value={personGender}
+                  label="Gender"
+                  onChange={(e) => setPersonGender(e.target.value)}
+                  disabled={creatingPerson}
+                >
+                  <MenuItem value="UNKNOWN">
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <PersonIcon fontSize="small" />
+                      <span>Unknown</span>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="MALE">
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <WcIcon fontSize="small" />
+                      <span>Male</span>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="FEMALE">
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <WcIcon fontSize="small" />
+                      <span>Female</span>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="OTHER">
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <PersonIcon fontSize="small" />
+                      <span>Other</span>
+                    </Box>
+                  </MenuItem>
+                </Select>
+              </FormControl>
+
+              <Button
+                variant="contained"
+                onClick={handleCreatePerson}
+                disabled={creatingPerson || !personFirstName.trim() || !personLastName.trim() || !personGender}
+                startIcon={creatingPerson ? <CircularProgress size={20} /> : <PersonAddIcon />}
+                fullWidth
+              >
+                {creatingPerson ? 'Creating...' : 'Create Person'}
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Add Relationship Card */}
       <Card sx={{ mb: 3 }}>
@@ -587,8 +894,139 @@ const Topology = () => {
         onSuccess={async () => {
           // Refetch topology after successful relationship creation
           await fetchTopologyData();
+          // Refetch relationships list
+          const updatedRelationships = await getRelationships({ familyId: activeFamilyId });
+          setRelationships(updatedRelationships || []);
         }}
       />
+
+      {/* Manage Relationships Card - Admin Only */}
+      {isFamilyAdmin && (
+        <Card sx={{ mb: 3 }}>
+          <CardHeader
+            title="Manage Relationships"
+            subheader="View and delete relationships"
+            avatar={<AccountTreeIcon />}
+          />
+          <Divider />
+          <CardContent>
+            {loadingRelationships ? (
+              <Box display="flex" justifyContent="center" p={4}>
+                <CircularProgress />
+              </Box>
+            ) : relationships.length > 0 ? (
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>From Person</TableCell>
+                      <TableCell>Type</TableCell>
+                      <TableCell>To Person</TableCell>
+                      <TableCell>Created</TableCell>
+                      <TableCell align="right">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {relationships.map((rel) => (
+                      <TableRow key={rel.id} hover>
+                        <TableCell>
+                          {rel.from_person ? `${rel.from_person.first_name} ${rel.from_person.last_name}` : `Person ${rel.from_person_id}`}
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={rel.type.replace('_', ' ')}
+                            size="small"
+                            color={rel.type === 'PARENT_OF' ? 'primary' : 'secondary'}
+                            icon={rel.type === 'PARENT_OF' ? <FamilyRestroomIcon /> : <WcIcon />}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          {rel.to_person ? `${rel.to_person.first_name} ${rel.to_person.last_name}` : `Person ${rel.to_person_id}`}
+                        </TableCell>
+                        <TableCell>
+                          {rel.created_at ? new Date(rel.created_at).toLocaleDateString() : 'N/A'}
+                        </TableCell>
+                        <TableCell align="right">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeleteClick(rel)}
+                            aria-label="delete relationship"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Box textAlign="center" py={4}>
+                <AccountTreeIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+                <Typography variant="body2" color="text.secondary">
+                  No relationships yet.
+                </Typography>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete Relationship</DialogTitle>
+        <DialogContent>
+          {deleteError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDeleteError(null)}>
+              {deleteError}
+            </Alert>
+          )}
+          {relationshipToDelete && (
+            <Box>
+              <Typography variant="body1" gutterBottom>
+                Are you sure you want to delete this relationship?
+              </Typography>
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  <strong>From:</strong>{' '}
+                  {relationshipToDelete.from_person
+                    ? `${relationshipToDelete.from_person.first_name} ${relationshipToDelete.from_person.last_name}`
+                    : `Person ${relationshipToDelete.from_person_id}`}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  <strong>Type:</strong> {relationshipToDelete.type.replace('_', ' ')}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  <strong>To:</strong>{' '}
+                  {relationshipToDelete.to_person
+                    ? `${relationshipToDelete.to_person.first_name} ${relationshipToDelete.to_person.last_name}`
+                    : `Person ${relationshipToDelete.to_person_id}`}
+                </Typography>
+                {relationshipToDelete.type === 'SPOUSE_OF' && (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    This will delete both directions of the spouse relationship.
+                  </Alert>
+                )}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={deletingRelationship}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            color="error"
+            variant="contained"
+            disabled={deletingRelationship}
+            startIcon={deletingRelationship ? <CircularProgress size={20} /> : <DeleteIcon />}
+          >
+            {deletingRelationship ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Nodes Card */}
       <Card sx={{ mb: 3 }}>

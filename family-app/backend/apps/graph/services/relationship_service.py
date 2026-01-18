@@ -102,3 +102,55 @@ def add_spouse(family, person_a, person_b):
     
     return relationship_ab, relationship_ba
 
+
+def delete_relationship(relationship):
+    """
+    Delete a relationship. For SPOUSE_OF relationships, deletes both directions.
+    
+    Args:
+        relationship: Relationship instance to delete
+        
+    Returns:
+        List of deleted Relationship instances (1 for PARENT_OF, 2 for SPOUSE_OF)
+        
+    Raises:
+        ValidationError: If relationship doesn't exist or deletion fails
+    """
+    deleted_relationships = []
+    
+    # For SPOUSE_OF, we need to delete both directions
+    if relationship.type == RelationshipTypeChoices.SPOUSE_OF:
+        # Find both directions
+        person_a = relationship.from_person
+        person_b = relationship.to_person
+        
+        # Get both relationships
+        relationship_ab = Relationship.objects.filter(
+            family=relationship.family,
+            from_person=person_a,
+            to_person=person_b,
+            type=RelationshipTypeChoices.SPOUSE_OF
+        ).first()
+        
+        relationship_ba = Relationship.objects.filter(
+            family=relationship.family,
+            from_person=person_b,
+            to_person=person_a,
+            type=RelationshipTypeChoices.SPOUSE_OF
+        ).first()
+        
+        # Delete both in a transaction
+        with transaction.atomic():
+            if relationship_ab:
+                deleted_relationships.append(relationship_ab)
+                relationship_ab.delete()
+            if relationship_ba and (not relationship_ab or relationship_ba.id != relationship_ab.id):
+                deleted_relationships.append(relationship_ba)
+                relationship_ba.delete()
+    else:
+        # For PARENT_OF, just delete the single relationship
+        with transaction.atomic():
+            deleted_relationships.append(relationship)
+            relationship.delete()
+    
+    return deleted_relationships

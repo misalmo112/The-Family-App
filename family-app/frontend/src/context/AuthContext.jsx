@@ -36,9 +36,19 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       return { success: true };
     } catch (error) {
+      // Provide more helpful error messages for network errors
+      let errorMessage = 'Login failed';
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        errorMessage = 'Cannot connect to server. Please ensure the backend server is running on http://127.0.0.1:8000';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       return {
         success: false,
-        error: error.response?.data?.detail || 'Login failed',
+        error: errorMessage,
       };
     }
   };
