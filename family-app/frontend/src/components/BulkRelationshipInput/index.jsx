@@ -23,6 +23,14 @@ import {
   Divider,
   Paper,
   Stack,
+  Tabs,
+  Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+  TableHead,
+  TableContainer,
 } from '@mui/material';
 import {
   PersonAdd as PersonAddIcon,
@@ -31,10 +39,73 @@ import {
   AccountTree as AccountTreeIcon,
   Warning as WarningIcon,
   Error as ErrorIcon,
+  UploadFile as UploadFileIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 import { createBulkRelationships } from '../../services/graph';
 import { translateBulkRelationships, validateRelationship } from '../../services/relationshipTranslator';
-import { relationshipCategories, getRelationshipDisplayName } from '../RelationshipWizard/relationshipIcons';
+import { relationshipCategories, getRelationshipDisplayName, allRelationshipLabels } from '../RelationshipWizard/relationshipIcons';
+
+const CSV_HEADERS = ['base_person_name', 'relationship_label', 'target_person_name'];
+const MAX_CSV_ROWS = 500;
+const TEMPLATE_FILENAME = 'bulk-relationships-template.csv';
+
+/** Parse a single CSV line handling quoted fields (e.g. "Name, Jr.",value) */
+function parseCSVLine(line) {
+  const result = [];
+  let i = 0;
+  while (i < line.length) {
+    if (line[i] === '"') {
+      let field = '';
+      i += 1;
+      while (i < line.length) {
+        if (line[i] === '"') {
+          if (line[i + 1] === '"') {
+            field += '"';
+            i += 2;
+          } else {
+            i += 1;
+            break;
+          }
+        } else {
+          field += line[i];
+          i += 1;
+        }
+      }
+      result.push(field.trim());
+    } else {
+      let field = '';
+      while (i < line.length && line[i] !== ',') {
+        field += line[i];
+        i += 1;
+      }
+      result.push(field.trim());
+      if (i < line.length) i += 1;
+    }
+  }
+  return result;
+}
+
+/** Parse CSV text into rows of { base_person_name, relationship_label, target_person_name } */
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const rows = [];
+  const headerNormalized = CSV_HEADERS.map((h) => h.toLowerCase());
+  for (let i = 0; i < lines.length; i++) {
+    const cells = parseCSVLine(lines[i]);
+    if (cells.length < 3) continue;
+    const isHeader = headerNormalized.includes(String(cells[0]).toLowerCase()) &&
+      headerNormalized.includes(String(cells[1]).toLowerCase()) &&
+      headerNormalized.includes(String(cells[2]).toLowerCase());
+    if (isHeader && rows.length === 0) continue;
+    rows.push({
+      base_person_name: (cells[0] || '').trim(),
+      relationship_label: (cells[1] || '').trim().toLowerCase(),
+      target_person_name: (cells[2] || '').trim(),
+    });
+  }
+  return rows;
+}
 
 /**
  * BulkRelationshipInput Component
@@ -56,19 +127,35 @@ const BulkRelationshipInput = ({
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
+  const [tabMode, setTabMode] = useState('manual');
+  const [csvRows, setCsvRows] = useState([]);
+  const [csvFileName, setCsvFileName] = useState('');
 
-  // Initialize base person when dialog opens
+  // Initialize base person when dialog opens; reset CSV state
   useEffect(() => {
     if (open) {
-      // Default to current user or viewer person
       const defaultPersonId = currentUserPersonId || viewerPersonId || (persons.length > 0 ? persons[0].id : null);
       setBasePersonId(defaultPersonId);
       setRelationships([]);
       setError(null);
       setSuccess(false);
       setValidationErrors({});
+      setCsvRows([]);
+      setCsvFileName('');
     }
   }, [open, currentUserPersonId, viewerPersonId, persons]);
+
+  // Name → person id map (normalized full name, first match; case-insensitive)
+  const nameToIdMap = useMemo(() => {
+    const map = new Map();
+    persons.forEach((p) => {
+      const full = `${p.first_name || ''} ${p.last_name || ''}`.trim();
+      if (!full) return;
+      const key = full.toLowerCase();
+      if (!map.has(key)) map.set(key, p.id);
+    });
+    return map;
+  }, [persons]);
 
   // Get all available relationship labels
   const allLabels = useMemo(() => {
@@ -171,6 +258,141 @@ const BulkRelationshipInput = ({
     return translateBulkRelationships(requests, topology);
   };
 
+  const downloadTemplate = () => {
+    const exampleRows = [
+      [CSV_HEADERS[0], CSV_HEADERS[1], CSV_HEADERS[2]],
+      ['John Doe', 'father', 'Mary Doe'],
+      ['Mary Doe', 'mother', 'John Doe'],
+    ];
+    const escape = (v) => (v.includes(',') || v.includes('"') ? `"${String(v).replace(/"/g, '""')}"` : v);
+    const csv = exampleRows.map((row) => row.map(escape).join(',')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = TEMPLATE_FILENAME;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const resolveName = (name) => {
+    if (!name) return null;
+    return nameToIdMap.get(name.toLowerCase()) ?? null;
+  };
+
+  const validateCsvRows = (rows) => {
+    return rows.map((row, idx) => {
+      const rowIndex = idx + 1;
+      const base = row.base_person_name;
+      const label = row.relationship_label;
+      const target = row.target_person_name;
+      const viewerId = resolveName(base);
+      const targetId = resolveName(target);
+      let error = null;
+      if (!viewerId) error = base ? `Person not found: ${base}` : 'Base person name is empty';
+      else if (!targetId) error = target ? `Person not found: ${target}` : 'Target person name is empty';
+      else if (!allRelationshipLabels.includes(label)) error = `Invalid label: ${label}`;
+      else if (viewerId === targetId) error = 'Same person on both sides';
+      else if (topology) {
+        const validation = validateRelationship(viewerId, targetId, label, topology);
+        if (!validation.valid) error = validation.errors?.join('. ') || 'Invalid relationship';
+      }
+      return {
+        rowIndex,
+        base_person_name: base,
+        relationship_label: label,
+        target_person_name: target,
+        viewerId: error ? null : viewerId,
+        targetId: error ? null : targetId,
+        error,
+      };
+    });
+  };
+
+  const handleCsvFileSelect = (event) => {
+    setError(null);
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setError('Please select a CSV file.');
+      return;
+    }
+    setCsvFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result ?? '';
+        const rows = parseCSV(text);
+        if (rows.length > MAX_CSV_ROWS) {
+          setError(`Too many rows. Maximum is ${MAX_CSV_ROWS}.`);
+          setCsvRows([]);
+          return;
+        }
+        if (rows.length === 0) {
+          setError('No data rows found in the CSV.');
+          setCsvRows([]);
+          return;
+        }
+        setCsvRows(validateCsvRows(rows));
+      } catch (err) {
+        setError('Failed to parse CSV. Check the file format.');
+        setCsvRows([]);
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+    event.target.value = '';
+  };
+
+  const csvValidRows = useMemo(
+    () => csvRows.filter((r) => !r.error && r.viewerId && r.targetId),
+    [csvRows]
+  );
+
+  const handleCsvRowRelationshipChange = (rowIndexOneBased, newLabel) => {
+    const rawRows = csvRows.map((r) => ({
+      base_person_name: r.base_person_name,
+      relationship_label: r.relationship_label,
+      target_person_name: r.target_person_name,
+    }));
+    const idx = rowIndexOneBased - 1;
+    if (idx >= 0 && idx < rawRows.length) {
+      rawRows[idx].relationship_label = newLabel;
+      setCsvRows(validateCsvRows(rawRows));
+    }
+  };
+
+  const handleCsvSubmit = async () => {
+    if (csvValidRows.length === 0) return;
+    setError(null);
+    setCreating(true);
+    try {
+      const relationshipsToSend = csvValidRows.map((r) => ({
+        viewerId: r.viewerId,
+        targetId: r.targetId,
+        label: r.relationship_label,
+      }));
+      const result = await createBulkRelationships({ familyId, relationships: relationshipsToSend });
+      setSuccess(true);
+      if (result.failed_count > 0) {
+        setError(`${result.created_count} created, ${result.failed_count} failed. ${(result.failed || []).map((f) => f.error).join('; ')}`);
+      }
+      setTimeout(() => {
+        setError(null);
+        if (onSuccess) onSuccess();
+        onClose();
+      }, 2000);
+    } catch (err) {
+      const errorMessage = err.response?.data?.error ||
+        (err.response?.data?.failed?.length
+          ? `${err.response.data.failed.length} relationship(s) failed. ${err.response.data.failed.map((f) => f.error).join('; ')}`
+          : null) ||
+        'Failed to create relationships. Please try again.';
+      setError(errorMessage);
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const handleCreate = async () => {
     setError(null);
 
@@ -263,18 +485,105 @@ const BulkRelationshipInput = ({
           </Alert>
         ) : (
           <>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Add multiple family relationships at once. Select a base person and add their relationships to other family members.
-            </Typography>
+            <Tabs value={tabMode} onChange={(_, v) => setTabMode(v)} sx={{ mb: 2 }}>
+              <Tab label="Manual" value="manual" />
+              <Tab label="CSV upload" value="csv" />
+            </Tabs>
 
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-                {error}
-              </Alert>
-            )}
+            {tabMode === 'csv' ? (
+              <Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  Download a template, fill it with base person name, relationship label, and target person name (use exact names as in the family). Then upload the CSV.
+                </Typography>
+                <Alert severity="info" sx={{ mb: 2 }} variant="outlined">
+                  <Typography variant="caption" component="span">
+                    <strong>How relationships are read:</strong> The label is from the <strong>base person&apos;s perspective</strong>. E.g. &quot;John Doe, father, Mary Doe&quot; means Mary Doe is John Doe&apos;s father (Mary is the parent, John is the child). To say John is Mary&apos;s father, use: Mary Doe, father, John Doe. You can fix the relationship type below using the dropdown.
+                  </Typography>
+                </Alert>
+                {error && (
+                  <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+                    {error}
+                  </Alert>
+                )}
+                <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                  <Button startIcon={<DownloadIcon />} onClick={downloadTemplate} variant="outlined" size="small">
+                    Download template
+                  </Button>
+                  <Button component="label" startIcon={<UploadFileIcon />} variant="outlined" size="small">
+                    {csvFileName || 'Select CSV file'}
+                    <input type="file" accept=".csv" hidden onChange={handleCsvFileSelect} />
+                  </Button>
+                </Stack>
+                {csvRows.length > 0 && (
+                  <>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      {csvValidRows.length} valid, {csvRows.filter((r) => r.error).length} error(s)
+                    </Typography>
+                    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, mb: 2 }}>
+                      <Table size="small" stickyHeader>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Row</TableCell>
+                            <TableCell>Base person</TableCell>
+                            <TableCell>Relationship</TableCell>
+                            <TableCell>Target person</TableCell>
+                            <TableCell>Status</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {csvRows.map((r) => (
+                            <TableRow key={r.rowIndex}>
+                              <TableCell>{r.rowIndex}</TableCell>
+                              <TableCell>{r.base_person_name}</TableCell>
+                              <TableCell>
+                                <FormControl size="small" fullWidth variant="outlined" sx={{ minWidth: 140 }}>
+                                  <Select
+                                    value={allRelationshipLabels.includes(r.relationship_label) ? r.relationship_label : ''}
+                                    onChange={(e) => handleCsvRowRelationshipChange(r.rowIndex, e.target.value)}
+                                    displayEmpty
+                                    disabled={creating}
+                                  >
+                                    <MenuItem value="" disabled>
+                                      {r.relationship_label || 'Select…'}
+                                    </MenuItem>
+                                    {allRelationshipLabels.map((label) => (
+                                      <MenuItem key={label} value={label}>
+                                        {getRelationshipDisplayName(label)}
+                                      </MenuItem>
+                                    ))}
+                                  </Select>
+                                </FormControl>
+                              </TableCell>
+                              <TableCell>{r.target_person_name}</TableCell>
+                              <TableCell>
+                                {r.error ? (
+                                  <Typography variant="caption" color="error">{r.error}</Typography>
+                                ) : (
+                                  <Chip label="OK" size="small" color="success" />
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </>
+                )}
+              </Box>
+            ) : (
+              <>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  Add multiple family relationships at once. Select a base person and add their relationships to other family members.
+                </Typography>
 
-            {/* Base Person Selection */}
-            <FormControl fullWidth sx={{ mb: 3 }}>
+                {error && (
+                  <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+                    {error}
+                  </Alert>
+                )}
+
+                {/* Base Person Selection */}
+                <FormControl fullWidth sx={{ mb: 3 }}>
               <InputLabel>Base Person *</InputLabel>
               <Select
                 value={basePersonId || ''}
@@ -458,6 +767,8 @@ const BulkRelationshipInput = ({
                 </List>
               </Alert>
             )}
+              </>
+            )}
           </>
         )}
       </DialogContent>
@@ -466,7 +777,17 @@ const BulkRelationshipInput = ({
         <Button onClick={onClose} disabled={creating || success}>
           {success ? 'Close' : 'Cancel'}
         </Button>
-        {!success && (
+        {!success && tabMode === 'csv' && (
+          <Button
+            onClick={handleCsvSubmit}
+            variant="contained"
+            disabled={creating || csvValidRows.length === 0}
+            startIcon={creating ? <CircularProgress size={20} /> : <PersonAddIcon />}
+          >
+            {creating ? 'Creating...' : `Create ${csvValidRows.length} Relationship(s)`}
+          </Button>
+        )}
+        {!success && tabMode === 'manual' && (
           <Button
             onClick={handleCreate}
             variant="contained"

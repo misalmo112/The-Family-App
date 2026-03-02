@@ -43,6 +43,13 @@ export const relationshipIcons = {
   // In-Laws
   'father-in-law': ElderlyIcon,
   'mother-in-law': ElderlyIcon,
+  'parent-in-law': ElderlyIcon,
+  'brother-in-law': PeopleIcon,
+  'sister-in-law': PeopleIcon,
+  'sibling-in-law': PeopleIcon,
+  'son-in-law': PeopleIcon,
+  'daughter-in-law': PeopleIcon,
+  'child-in-law': PeopleIcon,
   
   // Default
   default: PersonIcon,
@@ -89,10 +96,17 @@ export const relationshipCategories = {
   },
   inlaws: {
     title: 'In-Laws',
-    labels: ['father-in-law', 'mother-in-law'],
+    labels: ['father-in-law', 'mother-in-law', 'brother-in-law', 'sister-in-law', 'son-in-law', 'daughter-in-law'],
     color: 'info',
   },
 };
+
+/**
+ * Flat list of all allowed relationship labels (for CSV template and validation).
+ */
+export const allRelationshipLabels = Object.values(relationshipCategories).flatMap(
+  (category) => category.labels
+);
 
 /**
  * Get display name for a relationship label
@@ -122,6 +136,13 @@ export function getRelationshipDisplayName(label) {
     cousin: 'Cousin',
     'father-in-law': 'Father-in-Law',
     'mother-in-law': 'Mother-in-Law',
+    'parent-in-law': 'Parent-in-Law',
+    'brother-in-law': 'Brother-in-Law',
+    'sister-in-law': 'Sister-in-Law',
+    'sibling-in-law': 'Sibling-in-Law',
+    'son-in-law': 'Son-in-Law',
+    'daughter-in-law': 'Daughter-in-Law',
+    'child-in-law': 'Child-in-Law',
   };
   
   return displayNames[normalizedLabel] || label.charAt(0).toUpperCase() + label.slice(1);
