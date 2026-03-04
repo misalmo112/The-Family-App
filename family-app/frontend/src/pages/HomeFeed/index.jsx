@@ -27,7 +27,7 @@ const HomeFeed = () => {
   useEffect(() => {
     // Redirect to family selection if no active family
     if (!activeFamilyId) {
-      navigate('/families');
+      navigate('/app/families');
       return;
     }
 

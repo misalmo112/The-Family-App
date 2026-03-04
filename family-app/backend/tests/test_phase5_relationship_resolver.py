@@ -424,6 +424,47 @@ def test_resolve_gendered_labels():
 
 
 @pytest.mark.django_db
+def test_resolve_parent_label_inferred_from_other_parent():
+    """When one parent has unknown gender, infer mother/father from the other parent's gender"""
+    User = get_user_model()
+    user = User.objects.create_user(username="testuser", password="pass123")
+    family = Family.objects.create(name="Test Family", created_by=user)
+
+    father = Person.objects.create(
+        family=family,
+        first_name="Father",
+        last_name="One",
+        gender=GenderChoices.MALE
+    )
+    mother = Person.objects.create(
+        family=family,
+        first_name="Mother",
+        last_name="One",
+        gender=GenderChoices.UNKNOWN  # not set
+    )
+    child = Person.objects.create(
+        family=family,
+        first_name="Child",
+        last_name="One",
+        gender=GenderChoices.MALE
+    )
+    add_parent(family, father, child)
+    add_parent(family, mother, child)
+
+    # Resolver should infer "mother" because other parent is MALE
+    result = resolve_relationship(family.id, child.id, mother.id)
+    assert result["label"] == "mother"
+
+    # Resolver should infer "father" when other parent is FEMALE (set mother's gender for this check)
+    mother.gender = GenderChoices.FEMALE
+    mother.save(update_fields=["gender"])
+    father.gender = GenderChoices.UNKNOWN
+    father.save(update_fields=["gender"])
+    result = resolve_relationship(family.id, child.id, father.id)
+    assert result["label"] == "father"
+
+
+@pytest.mark.django_db
 def test_resolve_no_path():
     """Test resolving relationship when no path exists"""
     User = get_user_model()
@@ -488,12 +529,10 @@ def test_resolve_complex_paths():
     add_parent(family, grandparent, parent)
     add_parent(family, parent, child)
     
-    # Child viewing great grandparent (should find a path, but label might be "unrelated" 
-    # since we only support up to grandparent in MVP)
+    # Child viewing great grandparent (now supported as "great grandfather")
     result = resolve_relationship(family.id, child.id, great_grandparent.id)
-    assert len(result["path"]) > 0  # Path should exist
-    # The label might be "unrelated" if we don't support great-grandparent, or it might
-    # be something else depending on implementation
+    assert len(result["path"]) > 0
+    assert result["label"] == "great grandfather"
 
 
 @pytest.mark.django_db
@@ -540,3 +579,82 @@ def test_resolve_with_spouse_connections():
     # Actually, let me reconsider: if wife is spouse of husband, and husband is parent of child,
     # then the relationship is stepchild, but our MVP labels might not distinguish that
     # For now, "son" is acceptable
+
+
+@pytest.mark.django_db
+def test_resolve_father_in_law():
+    """Test resolving father-in-law: viewer -> spouse -> spouse's parent"""
+    User = get_user_model()
+    user = User.objects.create_user(username="testuser", password="pass123")
+    family = Family.objects.create(name="Test Family", created_by=user)
+
+    viewer = Person.objects.create(
+        family=family, first_name="Viewer", last_name="One", gender=GenderChoices.MALE
+    )
+    spouse = Person.objects.create(
+        family=family, first_name="Spouse", last_name="One", gender=GenderChoices.FEMALE
+    )
+    father_in_law = Person.objects.create(
+        family=family, first_name="FatherInLaw", last_name="One", gender=GenderChoices.MALE
+    )
+
+    add_spouse(family, viewer, spouse)
+    add_parent(family, father_in_law, spouse)
+
+    result = resolve_relationship(family.id, viewer.id, father_in_law.id)
+    assert result["label"] == "father-in-law"
+    assert len(result["path"]) == 3  # viewer -> spouse -> father_in_law
+
+
+@pytest.mark.django_db
+def test_resolve_son_in_law():
+    """Test resolving son-in-law: viewer -> child -> child's spouse"""
+    User = get_user_model()
+    user = User.objects.create_user(username="testuser", password="pass123")
+    family = Family.objects.create(name="Test Family", created_by=user)
+
+    viewer = Person.objects.create(
+        family=family, first_name="Viewer", last_name="One", gender=GenderChoices.MALE
+    )
+    child = Person.objects.create(
+        family=family, first_name="Child", last_name="One", gender=GenderChoices.FEMALE
+    )
+    son_in_law = Person.objects.create(
+        family=family, first_name="SonInLaw", last_name="One", gender=GenderChoices.MALE
+    )
+
+    add_parent(family, viewer, child)
+    add_spouse(family, child, son_in_law)
+
+    result = resolve_relationship(family.id, viewer.id, son_in_law.id)
+    assert result["label"] == "son-in-law"
+    assert len(result["path"]) == 3  # viewer -> child -> son_in_law
+
+
+@pytest.mark.django_db
+def test_resolve_brother_in_law():
+    """Test resolving brother-in-law: viewer -> spouse -> spouse's parent -> spouse's sibling"""
+    User = get_user_model()
+    user = User.objects.create_user(username="testuser", password="pass123")
+    family = Family.objects.create(name="Test Family", created_by=user)
+
+    viewer = Person.objects.create(
+        family=family, first_name="Viewer", last_name="One", gender=GenderChoices.MALE
+    )
+    spouse = Person.objects.create(
+        family=family, first_name="Spouse", last_name="One", gender=GenderChoices.FEMALE
+    )
+    parent_of_spouse = Person.objects.create(
+        family=family, first_name="ParentOfSpouse", last_name="One", gender=GenderChoices.MALE
+    )
+    brother_in_law = Person.objects.create(
+        family=family, first_name="BrotherInLaw", last_name="One", gender=GenderChoices.MALE
+    )
+
+    add_spouse(family, viewer, spouse)
+    add_parent(family, parent_of_spouse, spouse)
+    add_parent(family, parent_of_spouse, brother_in_law)
+
+    result = resolve_relationship(family.id, viewer.id, brother_in_law.id)
+    assert result["label"] == "brother-in-law"
+    assert len(result["path"]) == 4  # viewer -> spouse -> parent_of_spouse -> brother_in_law

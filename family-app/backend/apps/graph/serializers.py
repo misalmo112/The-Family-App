@@ -62,12 +62,13 @@ class RelationshipSerializer(serializers.ModelSerializer):
     from_person_id = serializers.IntegerField(write_only=True)
     to_person_id = serializers.IntegerField(write_only=True)
     type = serializers.ChoiceField(choices=RelationshipTypeChoices.choices)
+    label = serializers.CharField(required=False, allow_blank=True)
     from_person = PersonSerializer(read_only=True)
     to_person = PersonSerializer(read_only=True)
     
     class Meta:
         model = Relationship
-        fields = ['id', 'family_id', 'type', 'from_person_id', 'to_person_id', 'from_person', 'to_person', 'created_at', 'updated_at']
+        fields = ['id', 'family_id', 'type', 'from_person_id', 'to_person_id', 'label', 'from_person', 'to_person', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at', 'from_person', 'to_person']
     
     def validate(self, attrs):
@@ -149,14 +150,25 @@ class BulkFamilyUnitSerializer(serializers.Serializer):
 
 
 class BulkRelationshipRequestSerializer(serializers.Serializer):
-    """Serializer for a single relationship request in bulk operation"""
-    viewer_id = serializers.IntegerField()
-    target_id = serializers.IntegerField()
+    """Serializer for a single relationship request in bulk operation.
+    Accepts either (viewer_id, target_id) or (viewer_name, target_name)."""
+    viewer_id = serializers.IntegerField(required=False, allow_null=True)
+    target_id = serializers.IntegerField(required=False, allow_null=True)
+    viewer_name = serializers.CharField(required=False, allow_blank=True)
+    target_name = serializers.CharField(required=False, allow_blank=True)
     label = serializers.CharField(max_length=50)
     
     def validate(self, attrs):
-        """Validate that viewer_id and target_id are different"""
-        if attrs['viewer_id'] == attrs['target_id']:
+        """Require either both IDs or both names; if IDs, they must differ."""
+        has_ids = attrs.get('viewer_id') is not None and attrs.get('target_id') is not None
+        viewer_name = (attrs.get('viewer_name') or '').strip()
+        target_name = (attrs.get('target_name') or '').strip()
+        has_names = bool(viewer_name and target_name)
+        if has_ids and has_names:
+            raise serializers.ValidationError('Provide either viewer_id/target_id or viewer_name/target_name, not both.')
+        if not has_ids and not has_names:
+            raise serializers.ValidationError('Provide either viewer_id and target_id, or viewer_name and target_name.')
+        if has_ids and attrs['viewer_id'] == attrs['target_id']:
             raise serializers.ValidationError('Viewer and target cannot be the same person')
         return attrs
 
@@ -167,30 +179,54 @@ class BulkRelationshipSerializer(serializers.Serializer):
     relationships = BulkRelationshipRequestSerializer(many=True, min_length=1)
     
     def validate(self, attrs):
-        """Validate that all person IDs exist and belong to the family"""
+        """Validate shape; leave name resolution to the view (after admin check)."""
         family_id = attrs['family_id']
         try:
             family = Family.objects.get(id=family_id)
         except Family.DoesNotExist:
             raise serializers.ValidationError({'family_id': 'Family not found.'})
-        
-        # Collect all person IDs
+        attrs['family'] = family
+
+        normalized = []
+        for rel in attrs['relationships']:
+            viewer_id = rel.get('viewer_id')
+            target_id = rel.get('target_id')
+            viewer_name = (rel.get('viewer_name') or '').strip()
+            target_name = (rel.get('target_name') or '').strip()
+            has_ids = viewer_id is not None and target_id is not None
+            has_names = bool(viewer_name and target_name)
+            if has_names and not has_ids:
+                if viewer_name.lower() == target_name.lower():
+                    raise serializers.ValidationError({
+                        'relationships': 'Viewer and target cannot be the same person.'
+                    })
+                normalized.append({'viewer_name': viewer_name, 'target_name': target_name, 'label': rel['label']})
+            elif has_ids and not has_names:
+                if viewer_id == target_id:
+                    raise serializers.ValidationError({
+                        'relationships': 'Viewer and target cannot be the same person.'
+                    })
+                normalized.append({'viewer_id': viewer_id, 'target_id': target_id, 'label': rel['label']})
+            else:
+                raise serializers.ValidationError({
+                    'relationships': 'Each relationship must have viewer_id and target_id, or viewer_name and target_name.'
+                })
+        attrs['relationships'] = normalized
+
+        # Validate that any ID-based items refer to persons in this family
         person_ids = set()
         for rel in attrs['relationships']:
-            person_ids.add(rel['viewer_id'])
-            person_ids.add(rel['target_id'])
-        
-        # Verify all persons exist and belong to the family
-        persons = Person.objects.filter(id__in=person_ids, family=family)
-        found_ids = set(persons.values_list('id', flat=True))
-        missing_ids = person_ids - found_ids
-        
-        if missing_ids:
-            raise serializers.ValidationError({
-                'relationships': f'Persons with IDs {missing_ids} not found or do not belong to this family.'
-            })
-        
-        attrs['family'] = family
+            if 'viewer_id' in rel:
+                person_ids.add(rel['viewer_id'])
+                person_ids.add(rel['target_id'])
+        if person_ids:
+            persons = Person.objects.filter(id__in=person_ids, family=family)
+            found_ids = set(persons.values_list('id', flat=True))
+            missing_ids = person_ids - found_ids
+            if missing_ids:
+                raise serializers.ValidationError({
+                    'relationships': f'Persons with IDs {missing_ids} not found or do not belong to this family.'
+                })
         return attrs
 
 

@@ -5,6 +5,7 @@ import AppShell from './components/AppShell';
 import SuperadminLayout from './components/SuperadminLayout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Welcome from './pages/Welcome';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import PersonProfile from './pages/PersonProfile';
@@ -26,17 +27,18 @@ function App({ RouterComponent = BrowserRouter }) {
   return (
     <RouterComponent>
       <Routes>
+        <Route path="/" element={<Welcome />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route
-          path="/"
+          path="/app"
           element={
             <ProtectedRoute>
               <AppShell />
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/families" replace />} />
+          <Route index element={<Navigate to="/app/families" replace />} />
           <Route path="families" element={<Families />} />
           <Route path="feed" element={<Feed />} />
           <Route path="topology" element={<Topology />} />

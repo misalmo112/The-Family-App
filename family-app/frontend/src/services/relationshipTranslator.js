@@ -10,15 +10,16 @@ const DIRECT_LABELS = ['father', 'mother', 'son', 'daughter', 'husband', 'wife',
 
 // Indirect relationships that may require multiple edges or intermediate persons
 const INDIRECT_LABELS = [
-  'brother', 'sister', 
+  'brother', 'sister',
   'grandfather', 'grandmother', 'grandson', 'granddaughter',
   'uncle', 'aunt', 'nephew', 'niece', 'cousin',
-  'father-in-law', 'mother-in-law'
+  'father-in-law', 'mother-in-law',
+  'brother-in-law', 'sister-in-law', 'son-in-law', 'daughter-in-law'
 ];
 
 // Gender-specific labels
-const MALE_LABELS = ['father', 'son', 'husband', 'brother', 'grandfather', 'grandson', 'uncle', 'nephew', 'father-in-law'];
-const FEMALE_LABELS = ['mother', 'daughter', 'wife', 'sister', 'grandmother', 'granddaughter', 'aunt', 'niece', 'mother-in-law'];
+const MALE_LABELS = ['father', 'son', 'husband', 'brother', 'grandfather', 'grandson', 'uncle', 'nephew', 'father-in-law', 'brother-in-law', 'son-in-law'];
+const FEMALE_LABELS = ['mother', 'daughter', 'wife', 'sister', 'grandmother', 'granddaughter', 'aunt', 'niece', 'mother-in-law', 'sister-in-law', 'daughter-in-law'];
 const GENDER_NEUTRAL_LABELS = ['spouse', 'cousin'];
 
 /**
@@ -277,6 +278,67 @@ export function translateLabel(label, viewerId, targetId, topology) {
           });
         }
         // If target is already spouse's parent, no edge needed (relationship already exists)
+      }
+      break;
+
+    case 'brother-in-law':
+    case 'sister-in-law':
+      // Requires: viewer -> spouse -> spouse's parent -> spouse's sibling (target)
+      const spouseIdBil = getSpouse(viewerId, topology);
+      if (!spouseIdBil) {
+        missingPersons.push({
+          role: 'spouse',
+          message: `To add ${getPersonName(targetId, topology)} as your ${label}, you need a spouse first. Please add your spouse.`
+        });
+      } else {
+        const spouseParentsBil = getParents(spouseIdBil, topology);
+        if (spouseParentsBil.length === 0) {
+          missingPersons.push({
+            role: 'spouse_parent',
+            message: `To add ${getPersonName(targetId, topology)} as your ${label}, your spouse needs a parent first.`
+          });
+        } else {
+          const spouseParentId = spouseParentsBil[0];
+          const spouseSiblings = getChildren(spouseParentId, topology);
+          if (!spouseSiblings.includes(targetId) && targetId !== spouseIdBil) {
+            edges.push({
+              from: spouseParentId,
+              to: targetId,
+              type: 'PARENT_OF'
+            });
+          }
+        }
+      }
+      break;
+
+    case 'son-in-law':
+    case 'daughter-in-law':
+      // Requires: viewer -> child -> child's spouse (target)
+      const viewerChildrenSil = getChildren(viewerId, topology);
+      if (viewerChildrenSil.length === 0) {
+        missingPersons.push({
+          role: 'viewer_child',
+          message: `To add ${getPersonName(targetId, topology)} as your ${label}, you need a child first. Please add your child.`
+        });
+      } else {
+        const childAlreadyHasTarget = viewerChildrenSil.some(cid => getSpouse(cid, topology) === targetId);
+        if (childAlreadyHasTarget) {
+          // Target is already a spouse of one of viewer's children; no edge needed
+        } else {
+          const childWithoutSpouse = viewerChildrenSil.find(cid => !getSpouse(cid, topology));
+          if (childWithoutSpouse !== undefined) {
+            edges.push({
+              from: childWithoutSpouse,
+              to: targetId,
+              type: 'SPOUSE_OF'
+            });
+          } else {
+            missingPersons.push({
+              role: 'child_spouse',
+              message: `Each of your children already has a spouse linked. To add ${getPersonName(targetId, topology)} as your ${label}, link them as spouse to the correct child first.`
+            });
+          }
+        }
       }
       break;
 

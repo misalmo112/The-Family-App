@@ -305,7 +305,18 @@ def test_topology_all_nodes_have_relation_to_viewer():
     # All nodes should have relation_to_viewer field
     for node in nodes:
         assert "relation_to_viewer" in node
-        assert node["relation_to_viewer"] in ["self", "unknown", "unrelated", "father", "mother", "son", "daughter", "spouse", "brother", "sister", "parent", "child", "sibling", "grandfather", "grandmother", "grandparent", "grandson", "granddaughter", "grandchild", "uncle", "aunt", "aunt/uncle", "nephew", "niece", "niece/nephew", "cousin"]
+        valid_labels = [
+            "self", "unknown", "unrelated",
+            "father", "mother", "son", "daughter", "spouse", "brother", "sister", "parent", "child", "sibling",
+            "grandfather", "grandmother", "grandparent", "grandson", "granddaughter", "grandchild",
+            "uncle", "aunt", "aunt/uncle", "nephew", "niece", "niece/nephew", "cousin",
+            "father-in-law", "mother-in-law", "parent-in-law", "son-in-law", "daughter-in-law", "child-in-law",
+            "brother-in-law", "sister-in-law", "sibling-in-law",
+            "great grandfather", "great grandmother", "great grandparent", "great grandson", "great granddaughter", "great grandchild",
+        ]
+        assert node["relation_to_viewer"] in valid_labels or (
+            node["relation_to_viewer"].startswith("great ") and "grand" in node["relation_to_viewer"]
+        ), f"Unexpected relation_to_viewer: {node['relation_to_viewer']}"
 
 
 @pytest.mark.django_db

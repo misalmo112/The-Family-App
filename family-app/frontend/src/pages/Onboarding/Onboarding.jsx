@@ -120,7 +120,7 @@ const Onboarding = () => {
   };
 
   const handleGoToFeed = () => {
-    navigate('/feed');
+    navigate('/app/feed');
   };
 
   const handleGoToPending = () => {
@@ -331,7 +331,7 @@ const Onboarding = () => {
                     href="/profile"
                     onClick={(e) => {
                       e.preventDefault();
-                      navigate('/profile');
+                      navigate('/app/profile');
                     }}
                     sx={{ textTransform: 'none', p: 0, minWidth: 'auto', verticalAlign: 'baseline' }}
                   >
@@ -390,7 +390,7 @@ const Onboarding = () => {
                     href="/profile"
                     onClick={(e) => {
                       e.preventDefault();
-                      navigate('/profile');
+                      navigate('/app/profile');
                     }}
                     sx={{ textTransform: 'none', p: 0, minWidth: 'auto', verticalAlign: 'baseline' }}
                   >
@@ -411,7 +411,7 @@ const Onboarding = () => {
                   variant="outlined"
                   size="large"
                   fullWidth
-                  onClick={() => navigate('/families')}
+                  onClick={() => navigate('/app/families')}
                 >
                   Back to Families
                 </Button>

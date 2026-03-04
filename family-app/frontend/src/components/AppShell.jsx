@@ -31,12 +31,12 @@ import { useFamily } from '../context/FamilyContext';
 import FamilySwitcher from './Layout/FamilySwitcher';
 
 const navigationItems = [
-  { path: '/feed', label: 'Chats', icon: <ChatIcon />, badge: null },
-  { path: '/families', label: 'Families', icon: <PeopleIcon />, badge: null },
-  { path: '/topology', label: 'Topology', icon: <AccountTreeIcon />, badge: null },
-  { path: '/join', label: 'Join Family', icon: <GroupAddIcon />, badge: null },
-  { path: '/admin/join-requests', label: 'Join Requests', icon: <AdminPanelSettingsIcon />, badge: null },
-  { path: '/profile', label: 'Profile', icon: <PersonIcon />, badge: null },
+  { path: '/app/feed', label: 'Chats', icon: <ChatIcon />, badge: null },
+  { path: '/app/families', label: 'Families', icon: <PeopleIcon />, badge: null },
+  { path: '/app/topology', label: 'Topology', icon: <AccountTreeIcon />, badge: null },
+  { path: '/app/join', label: 'Join Family', icon: <GroupAddIcon />, badge: null },
+  { path: '/app/admin/join-requests', label: 'Join Requests', icon: <AdminPanelSettingsIcon />, badge: null },
+  { path: '/app/profile', label: 'Profile', icon: <PersonIcon />, badge: null },
 ];
 
 const AppShell = () => {
@@ -46,7 +46,7 @@ const AppShell = () => {
   const location = useLocation();
   const [anchorEl, setAnchorEl] = useState(null);
   const userMenuOpen = Boolean(anchorEl);
-  const isFeedRoute = location.pathname.startsWith('/feed');
+  const isFeedRoute = location.pathname.startsWith('/app/feed');
 
   const handleLogout = () => {
     logout();
@@ -63,10 +63,16 @@ const AppShell = () => {
   };
 
   const isActiveRoute = (path) => {
-    if (path === '/families') {
-      return location.pathname === '/' || location.pathname === '/families';
+    // Treat /app and /app/families as the "Families" tab
+    if (path === '/app/families') {
+      return (
+        location.pathname === '/app' ||
+        location.pathname === '/app/' ||
+        location.pathname === '/app/families' ||
+        location.pathname.startsWith('/app/families/')
+      );
     }
-    return location.pathname === path || location.pathname.startsWith(path + '/');
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
   const getInitials = (name) => {
@@ -157,7 +163,7 @@ const AppShell = () => {
       >
         <MenuItem
           onClick={() => {
-            navigate('/profile');
+            navigate('/app/profile');
             handleUserMenuClose();
           }}
         >
@@ -168,7 +174,7 @@ const AppShell = () => {
         </MenuItem>
         <MenuItem
           onClick={() => {
-            navigate('/settings');
+            navigate('/app/settings');
             handleUserMenuClose();
           }}
         >

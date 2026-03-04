@@ -5,7 +5,7 @@ import { useFamily } from '../context/FamilyContext';
 import { getFamilies } from '../services/families';
 
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { activeFamilyId } = useFamily();
   const location = useLocation();
   const [hasFamilies, setHasFamilies] = useState(null);
@@ -16,7 +16,7 @@ const ProtectedRoute = ({ children }) => {
   const onboardingRoutes = ['/onboarding', '/pending'];
 
   // Routes that require an active family
-  const familyRequiredRoutes = ['/feed', '/topology'];
+  const familyRequiredRoutes = ['/app/feed', '/app/topology'];
 
   useEffect(() => {
     const checkFamilies = async () => {
@@ -59,13 +59,13 @@ const ProtectedRoute = ({ children }) => {
     checkFamilies();
   }, [isAuthenticated, location.pathname]);
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  // Show loading while checking auth state
+  if (authLoading || checking) {
+    return null; // Or a loading spinner if preferred
   }
 
-  // Show loading while checking
-  if (checking) {
-    return null; // Or a loading spinner if preferred
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
 
   // If user has no families and is not on onboarding routes, redirect to onboarding
@@ -84,7 +84,7 @@ const ProtectedRoute = ({ children }) => {
     if (!activeFamilyId) {
       // If user has families but no active one, go to families page
       // Otherwise onboarding will handle it
-      return <Navigate to="/families" replace />;
+      return <Navigate to="/app/families" replace />;
     }
   }
 

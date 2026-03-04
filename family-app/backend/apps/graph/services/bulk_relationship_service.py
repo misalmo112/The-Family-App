@@ -1,10 +1,73 @@
 # Bulk relationship service
 from django.db import transaction
 from django.core.exceptions import ValidationError
-from apps.graph.models import Person, Relationship, RelationshipTypeChoices
+from apps.graph.models import Person, Relationship, RelationshipTypeChoices, GenderChoices
 from apps.families.models import Family
 from apps.graph.services.relationship_service import add_parent, add_spouse
 from apps.graph.services.topology_service import get_family_topology
+
+# Gender auto-set: same label sets as views._apply_gender_from_label
+_PARENT_OF_FROM_FEMALE = {'mother', 'grandmother', 'mother-in-law'}
+_PARENT_OF_FROM_MALE = {'father', 'grandfather', 'father-in-law'}
+_PARENT_OF_TO_FEMALE = {'daughter', 'granddaughter', 'sister', 'aunt', 'niece', 'sister-in-law', 'daughter-in-law'}
+_PARENT_OF_TO_MALE = {'son', 'grandson', 'brother', 'uncle', 'nephew', 'brother-in-law', 'son-in-law'}
+_SPOUSE_OF_TO_FEMALE = {'wife'}
+_SPOUSE_OF_TO_MALE = {'husband'}
+
+
+def _apply_gender_from_label_bulk(label, relationship_type, from_person, to_person):
+    """Set person gender when relationship is created with a gender-specific label (bulk flow)."""
+    if not label:
+        return
+    label = (label or '').strip().lower()
+    if relationship_type == RelationshipTypeChoices.PARENT_OF:
+        if label in _PARENT_OF_FROM_FEMALE:
+            from_person.gender = GenderChoices.FEMALE
+            from_person.save(update_fields=['gender', 'updated_at'])
+        elif label in _PARENT_OF_FROM_MALE:
+            from_person.gender = GenderChoices.MALE
+            from_person.save(update_fields=['gender', 'updated_at'])
+        elif label in _PARENT_OF_TO_FEMALE:
+            to_person.gender = GenderChoices.FEMALE
+            to_person.save(update_fields=['gender', 'updated_at'])
+        elif label in _PARENT_OF_TO_MALE:
+            to_person.gender = GenderChoices.MALE
+            to_person.save(update_fields=['gender', 'updated_at'])
+    elif relationship_type == RelationshipTypeChoices.SPOUSE_OF:
+        if label in _SPOUSE_OF_TO_FEMALE:
+            to_person.gender = GenderChoices.FEMALE
+            to_person.save(update_fields=['gender', 'updated_at'])
+        elif label in _SPOUSE_OF_TO_MALE:
+            to_person.gender = GenderChoices.MALE
+            to_person.save(update_fields=['gender', 'updated_at'])
+
+
+def resolve_or_create_person(family, full_name):
+    """
+    Find a person in the family by normalized full name, or create one if not found.
+    Matching is case-insensitive and trims whitespace. New persons are created
+    with name split on first space (first_name, last_name).
+    """
+    name = (full_name or '').strip()
+    if not name:
+        raise ValidationError('Person name cannot be empty.')
+    name_lower = name.lower()
+    # Match existing: full name equals (first_name + ' ' + last_name).strip() case-insensitive
+    for person in Person.objects.filter(family=family):
+        existing_full = f"{person.first_name or ''} {person.last_name or ''}".strip().lower()
+        if existing_full == name_lower:
+            return person
+    # Create: split on first space
+    parts = name.split(None, 1)
+    first_name = parts[0] if parts else ''
+    last_name = parts[1] if len(parts) > 1 else ''
+    if not first_name:
+        raise ValidationError(f'Invalid person name: "{full_name}".')
+    return Person.objects.create(
+        family=family,
+        first_name=first_name,
+        last_name=last_name,
+    )
 
 
 def _get_parents(person_id, edges):
@@ -244,6 +307,60 @@ def _translate_label_to_edges(label, viewer_id, target_id, topology):
                     'to': spouse_id,
                     'type': RelationshipTypeChoices.PARENT_OF
                 })
+
+    elif normalized_label in ['brother-in-law', 'sister-in-law']:
+        # Requires: viewer -> spouse -> spouse's parent -> spouse's sibling (target)
+        spouse_id_bil = _get_spouse(viewer_id, edges_list)
+        if not spouse_id_bil:
+            missing_persons.append({
+                'role': 'spouse',
+                'message': f'To add {get_person_name(target_id)} as your {label}, you need a spouse first. Please add your spouse.'
+            })
+        else:
+            spouse_parents_bil = _get_parents(spouse_id_bil, edges_list)
+            if not spouse_parents_bil:
+                missing_persons.append({
+                    'role': 'spouse_parent',
+                    'message': f'To add {get_person_name(target_id)} as your {label}, your spouse needs a parent first.'
+                })
+            else:
+                spouse_parent_id = spouse_parents_bil[0]
+                spouse_siblings = _get_children(spouse_parent_id, edges_list)
+                if target_id not in spouse_siblings and target_id != spouse_id_bil:
+                    edges.append({
+                        'from': spouse_parent_id,
+                        'to': target_id,
+                        'type': RelationshipTypeChoices.PARENT_OF
+                    })
+
+    elif normalized_label in ['son-in-law', 'daughter-in-law']:
+        # Requires: viewer -> child -> child's spouse (target)
+        viewer_children_sil = _get_children(viewer_id, edges_list)
+        if not viewer_children_sil:
+            missing_persons.append({
+                'role': 'viewer_child',
+                'message': f'To add {get_person_name(target_id)} as your {label}, you need a child first. Please add your child.'
+            })
+        else:
+            child_already_has_target = any(
+                _get_spouse(cid, edges_list) == target_id for cid in viewer_children_sil
+            )
+            if not child_already_has_target:
+                child_without_spouse = next(
+                    (cid for cid in viewer_children_sil if not _get_spouse(cid, edges_list)),
+                    None
+                )
+                if child_without_spouse is not None:
+                    edges.append({
+                        'from': child_without_spouse,
+                        'to': target_id,
+                        'type': RelationshipTypeChoices.SPOUSE_OF
+                    })
+                else:
+                    missing_persons.append({
+                        'role': 'child_spouse',
+                        'message': f'Each of your children already has a spouse linked. To add {get_person_name(target_id)} as your {label}, link them as spouse to the correct child first.'
+                    })
     
     else:
         warnings.append(f'Unknown relationship label: {label}')
@@ -404,9 +521,25 @@ def create_bulk_relationships(family, relationship_requests):
                         if edge['type'] == RelationshipTypeChoices.PARENT_OF:
                             rel = add_parent(family, from_person, to_person)
                             created.append(rel)
+                            req = edge_metadata.get((edge['from'], edge['to'], edge['type']))
+                            if req:
+                                _apply_gender_from_label_bulk(
+                                    req.get('label'),
+                                    edge['type'],
+                                    from_person,
+                                    to_person,
+                                )
                         elif edge['type'] == RelationshipTypeChoices.SPOUSE_OF:
                             rel1, rel2 = add_spouse(family, from_person, to_person)
                             created.extend([rel1, rel2])
+                            req = edge_metadata.get((edge['from'], edge['to'], edge['type']))
+                            if req:
+                                _apply_gender_from_label_bulk(
+                                    req.get('label'),
+                                    edge['type'],
+                                    from_person,
+                                    to_person,
+                                )
                     except ValidationError as e:
                         # Mark the request that led to this edge as failed
                         if (edge['from'], edge['to'], edge['type']) in edge_metadata:

@@ -10,6 +10,7 @@ import {
   Alert,
   Stack,
   Chip,
+  CircularProgress,
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 
@@ -18,11 +19,13 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (only after loading is complete)
   useEffect(() => {
+    if (isLoading) return; // Wait for auth state to be determined
+    
     if (isAuthenticated) {
       // Check if user is superadmin
       const checkSuperadmin = async () => {
@@ -31,12 +34,12 @@ const Login = () => {
           await getHealth();
           navigate('/superadmin');
         } catch (err) {
-          navigate('/families');
+          navigate('/app/families');
         }
       };
       checkSuperadmin();
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isLoading, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,12 +56,31 @@ const Login = () => {
         await getHealth();
         navigate('/superadmin');
       } catch (err) {
-        navigate('/families');
+        navigate('/app/families');
       }
     } else {
       setError(result.error || 'Login failed');
     }
   };
+
+  // Show loading while checking auth state
+  if (isLoading) {
+    return (
+      <Container maxWidth="sm">
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100vh',
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="sm">

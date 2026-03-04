@@ -41,7 +41,7 @@ const CreatePost = () => {
   useEffect(() => {
     // Redirect to family selection if no active family
     if (!activeFamilyId) {
-      navigate('/families');
+      navigate('/app/families');
       return;
     }
   }, [activeFamilyId, navigate]);
@@ -87,7 +87,7 @@ const CreatePost = () => {
       });
 
       // Navigate to feed on success
-      navigate('/feed');
+      navigate('/app/feed');
     } catch (err) {
       console.error('Error creating post:', err);
       if (err.response) {

@@ -10,6 +10,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { Box, Avatar, Typography, Chip } from '@mui/material';
 import { Person as PersonIcon } from '@mui/icons-material';
+import { getRelationshipDisplayName } from '../RelationshipWizard/relationshipIcons';
 
 /**
  * Custom Node Component for Family Graph
@@ -60,7 +61,7 @@ const FamilyNode = ({ data }) => {
       )}
       {relationLabel && !isEgo && (
         <Chip
-          label={relationLabel}
+          label={getRelationshipDisplayName(relationLabel)}
           size="small"
           color="info"
           sx={{ mt: 0.5 }}

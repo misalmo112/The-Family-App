@@ -1,4 +1,5 @@
 # Relationship completion service
+from django.db.models import Q
 from apps.graph.models import Person, Relationship, RelationshipTypeChoices
 from apps.families.models import Family
 import json
@@ -68,15 +69,15 @@ def analyze_missing_relationships(family_id, person_id=None):
             if parents.count() == 1:
                 parent = parents.first().from_person
                 _log_debug('relationship_completion.py:39', 'Found single parent', {'person_id': person.id, 'parent_id': parent.id, 'parent_name': f'{parent.first_name} {parent.last_name}'}, 'A')
-                # Check if parent has a spouse
+                # Check if parent has a spouse (SPOUSE_OF is stored both A->B and B->A)
                 spouse_rels = Relationship.objects.filter(
                     family=family,
-                    from_person=parent,
                     type=RelationshipTypeChoices.SPOUSE_OF
-                )
+                ).filter(Q(from_person=parent) | Q(to_person=parent))
                 _log_debug('relationship_completion.py:46', 'Spouse relationships queried', {'parent_id': parent.id, 'spouse_count': spouse_rels.count()}, 'A')
                 if spouse_rels.exists():
-                    spouse = spouse_rels.first().to_person
+                    rel = spouse_rels.first()
+                    spouse = rel.to_person if rel.from_person_id == parent.id else rel.from_person
                     _log_debug('relationship_completion.py:48', 'Found spouse', {'parent_id': parent.id, 'spouse_id': spouse.id, 'spouse_name': f'{spouse.first_name} {spouse.last_name}'}, 'A')
                     # Check if spouse is already a parent
                     existing_parent_rel = Relationship.objects.filter(
@@ -104,12 +105,11 @@ def analyze_missing_relationships(family_id, person_id=None):
         try:
             spouse_rels = Relationship.objects.filter(
                 family=family,
-                from_person=person,
                 type=RelationshipTypeChoices.SPOUSE_OF
-            )
+            ).filter(Q(from_person=person) | Q(to_person=person))
             _log_debug('relationship_completion.py:70', 'Person spouse relationships', {'person_id': person.id, 'spouse_count': spouse_rels.count()}, 'A')
             for spouse_rel in spouse_rels:
-                spouse = spouse_rel.to_person
+                spouse = spouse_rel.to_person if spouse_rel.from_person_id == person.id else spouse_rel.from_person
                 spouse_parents = Relationship.objects.filter(
                     family=family,
                     to_person=spouse,
@@ -120,11 +120,11 @@ def analyze_missing_relationships(family_id, person_id=None):
                     spouse_parent = spouse_parents.first().from_person
                     spouse_parent_spouse_rels = Relationship.objects.filter(
                         family=family,
-                        from_person=spouse_parent,
                         type=RelationshipTypeChoices.SPOUSE_OF
-                    )
+                    ).filter(Q(from_person=spouse_parent) | Q(to_person=spouse_parent))
                     if spouse_parent_spouse_rels.exists():
-                        spouse_parent_spouse = spouse_parent_spouse_rels.first().to_person
+                        rel = spouse_parent_spouse_rels.first()
+                        spouse_parent_spouse = rel.to_person if rel.from_person_id == spouse_parent.id else rel.from_person
                         # Check if spouse_parent_spouse is already a parent of spouse
                         if not Relationship.objects.filter(
                             family=family,

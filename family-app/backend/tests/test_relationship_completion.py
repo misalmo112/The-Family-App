@@ -79,6 +79,66 @@ def test_completion_detects_missing_parent():
 
 
 @pytest.mark.django_db
+def test_completion_detects_missing_parent_reverse_spouse_order():
+    """Test that completion detects missing parent when spouse relationship is stored as (parent2 -> parent1)"""
+    User = get_user_model()
+    admin = User.objects.create_user(username="completion1b", password="pass12345")
+
+    c = APIClient()
+    token = c.post("/api/auth/token/", {"username": "completion1b", "password": "pass12345"}, format="json").json()["access"]
+    c.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    fam = c.post("/api/families/", {"name": "CompletionFam1b"}, format="json").json()
+    family_id = fam["id"]
+
+    parent1 = c.post("/api/graph/persons/", {
+        "family_id": family_id,
+        "first_name": "Parent",
+        "last_name": "One",
+        "gender": "MALE"
+    }, format="json").json()
+
+    parent2 = c.post("/api/graph/persons/", {
+        "family_id": family_id,
+        "first_name": "Parent",
+        "last_name": "Two",
+        "gender": "FEMALE"
+    }, format="json").json()
+
+    child = c.post("/api/graph/persons/", {
+        "family_id": family_id,
+        "first_name": "Child",
+        "last_name": "One",
+        "gender": "MALE"
+    }, format="json").json()
+
+    # Create spouse relationship in reverse order (parent2 -> parent1)
+    c.post("/api/graph/relationships/", {
+        "family_id": family_id,
+        "type": "SPOUSE_OF",
+        "from_person_id": parent2["id"],
+        "to_person_id": parent1["id"],
+    }, format="json")
+
+    # Add only parent1-child (missing parent2)
+    c.post("/api/graph/relationships/", {
+        "family_id": family_id,
+        "type": "PARENT_OF",
+        "from_person_id": parent1["id"],
+        "to_person_id": child["id"],
+    }, format="json")
+
+    completion_resp = c.get("/api/graph/relationships/completion/", {"family_id": family_id})
+    assert completion_resp.status_code == 200
+    suggestions = completion_resp.json()["suggestions"]
+    assert len(suggestions) > 0
+    missing_parent_suggestion = next((s for s in suggestions if s["type"] == "missing_parent"), None)
+    assert missing_parent_suggestion is not None
+    assert missing_parent_suggestion["from_person_id"] == parent2["id"]
+    assert missing_parent_suggestion["to_person_id"] == child["id"]
+
+
+@pytest.mark.django_db
 def test_completion_no_suggestions_when_complete():
     """Test that completion assistant returns no suggestions when family structure is complete"""
     User = get_user_model()

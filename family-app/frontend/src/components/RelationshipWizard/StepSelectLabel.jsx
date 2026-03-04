@@ -51,6 +51,10 @@ const StepSelectLabel = ({
       cousin: 'Requires: Viewer → Parent → Grandparent → Parent\'s sibling → Cousin',
       'father-in-law': 'Requires: Viewer → Spouse → Spouse\'s Father',
       'mother-in-law': 'Requires: Viewer → Spouse → Spouse\'s Mother',
+      'brother-in-law': 'Requires: Viewer → Spouse → Spouse\'s sibling',
+      'sister-in-law': 'Requires: Viewer → Spouse → Spouse\'s sibling',
+      'son-in-law': 'Requires: Viewer → Child → Child\'s spouse',
+      'daughter-in-law': 'Requires: Viewer → Child → Child\'s spouse',
     };
     return tooltips[label.toLowerCase()] || 'Select this relationship type';
   };

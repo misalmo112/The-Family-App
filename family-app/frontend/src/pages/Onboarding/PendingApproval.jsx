@@ -56,7 +56,7 @@ const PendingApproval = () => {
         if (approvedRequest) {
           // Auto-select the first family
           setActiveFamily(families[0].id, families[0].name);
-          navigate('/feed');
+          navigate('/app/feed');
         }
       }
     } catch (err) {
@@ -200,7 +200,7 @@ const PendingApproval = () => {
                               const family = families.find((f) => f.id === request.family?.id);
                               if (family) {
                                 setActiveFamily(family.id, family.name);
-                                navigate('/feed');
+                                navigate('/app/feed');
                               }
                             } catch (err) {
                               console.error('Error loading families:', err);
@@ -235,7 +235,7 @@ const PendingApproval = () => {
             <Button variant="outlined" onClick={() => navigate('/onboarding')}>
               Join Another Family
             </Button>
-            <Button variant="outlined" onClick={() => navigate('/families')}>
+            <Button variant="outlined" onClick={() => navigate('/app/families')}>
               Back to Families
             </Button>
           </Box>

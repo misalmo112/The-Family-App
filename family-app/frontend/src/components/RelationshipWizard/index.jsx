@@ -211,7 +211,7 @@ const RelationshipWizard = ({
     setError(null);
 
     try {
-      // Create each edge sequentially
+      // Create each edge sequentially (pass label so backend can set gender for grandmother, uncle, etc.)
       let lastEdge = null;
       for (const edge of translation.edges) {
         await createRelationship({
@@ -219,6 +219,7 @@ const RelationshipWizard = ({
           fromPersonId: edge.from,
           toPersonId: edge.to,
           type: edge.type,
+          ...(selectedLabel && { label: selectedLabel }),
         });
         lastEdge = edge;
       }

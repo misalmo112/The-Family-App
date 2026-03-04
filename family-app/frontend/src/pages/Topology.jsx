@@ -64,6 +64,7 @@ import { useFamily } from '../context/FamilyContext';
 import { getPersons, getTopology, createRelationship, createPerson, getCurrentUserPersonId, getRelationships, deleteRelationship, getRelationshipCompletion } from '../services/graph';
 import { checkIsFamilyAdmin } from '../services/families';
 import RelationshipWizard from '../components/RelationshipWizard';
+import { getRelationshipDisplayName } from '../components/RelationshipWizard/relationshipIcons';
 import FamilyGraph from '../components/FamilyGraph';
 import BulkFamilyUnit from '../components/BulkFamilyUnit';
 import BulkRelationshipInput from '../components/BulkRelationshipInput';
@@ -743,7 +744,7 @@ const Topology = () => {
                         <Stack spacing={1}>
                           {node.relation_to_viewer && !isViewer && !isCurrentUser && (
                             <Chip
-                              label={node.relation_to_viewer}
+                              label={getRelationshipDisplayName(node.relation_to_viewer)}
                               size="small"
                               color="info"
                               icon={<AccountTreeIcon />}

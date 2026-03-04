@@ -60,15 +60,18 @@ export const createPerson = async ({ familyId, firstName, lastName, dob, gender 
  * @param {number} params.fromPersonId - The person ID for the "from" side
  * @param {number} params.toPersonId - The person ID for the "to" side
  * @param {string} params.type - Relationship type ('PARENT_OF' or 'SPOUSE_OF')
+ * @param {string} [params.label] - Optional label (e.g. 'mother', 'father') to auto-set parent gender
  * @returns {Promise<Object>} Created relationship object(s)
  */
-export const createRelationship = async ({ familyId, fromPersonId, toPersonId, type }) => {
-  const response = await api.post('/api/graph/relationships/', {
+export const createRelationship = async ({ familyId, fromPersonId, toPersonId, type, label }) => {
+  const body = {
     family_id: familyId,
     from_person_id: fromPersonId,
     to_person_id: toPersonId,
-    type: type,  // 'PARENT_OF' or 'SPOUSE_OF'
-  });
+    type: type,
+  };
+  if (label) body.label = label;
+  const response = await api.post('/api/graph/relationships/', body);
   return response.data;
 };
 
@@ -144,12 +147,9 @@ export const getRelationshipCompletion = async ({ familyId, personId = null }) =
   fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'graph.js:128',message:'getRelationshipCompletion called',data:{familyId,personId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
   // #endregion
   try {
-    const response = await api.get('/api/graph/relationships/completion/', {
-      params: {
-        family_id: familyId,
-        person_id: personId,
-      },
-    });
+    const params = { family_id: familyId };
+    if (personId != null && personId !== '') params.person_id = personId;
+    const response = await api.get('/api/graph/relationships/completion/', { params });
     // #region agent log
     fetch('http://127.0.0.1:7243/ingest/6368f2fd-ba5e-49e7-ab28-982fbdfb0612',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'graph.js:136',message:'API response received',data:{status:response.status,hasSuggestions:!!response.data.suggestions,suggestionsCount:response.data.suggestions?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
     // #endregion
@@ -182,20 +182,22 @@ export const createFamilyUnit = async ({ familyId, parent1Id, parent2Id, childre
 };
 
 /**
- * Create multiple relationships in bulk using user-friendly labels
+ * Create multiple relationships in bulk using user-friendly labels.
+ * Each relationship may use viewer_id/target_id (manual tab) or viewer_name/target_name (CSV; backend resolves or creates persons).
  * @param {Object} params - Bulk relationship parameters
  * @param {number} params.familyId - The family ID
- * @param {Array<Object>} params.relationships - Array of relationship objects with viewerId, targetId, label
+ * @param {Array<Object>} params.relationships - Array of { viewerId, targetId, label } or { viewer_name, target_name, label }
  * @returns {Promise<Object>} Result with created relationships, failed relationships, and warnings
  */
 export const createBulkRelationships = async ({ familyId, relationships }) => {
   const response = await api.post('/api/graph/relationships/bulk/', {
     family_id: familyId,
-    relationships: relationships.map(rel => ({
-      viewer_id: rel.viewerId,
-      target_id: rel.targetId,
-      label: rel.label,
-    })),
+    relationships: relationships.map((rel) => {
+      if (rel.viewer_name != null && rel.target_name != null) {
+        return { viewer_name: rel.viewer_name, target_name: rel.target_name, label: rel.label };
+      }
+      return { viewer_id: rel.viewerId, target_id: rel.targetId, label: rel.label };
+    }),
   });
   return response.data;
 };

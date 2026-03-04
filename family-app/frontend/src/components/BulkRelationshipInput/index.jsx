@@ -172,7 +172,7 @@ const BulkRelationshipInput = ({
   };
 
   const handleAddRelationship = () => {
-    setRelationships([...relationships, { label: '', targetId: null, id: Date.now() }]);
+    setRelationships([...relationships, { label: '', targetId: null, targetName: '', id: Date.now() }]);
   };
 
   const handleRemoveRelationship = (id) => {
@@ -184,11 +184,17 @@ const BulkRelationshipInput = ({
   };
 
   const handleRelationshipChange = (id, field, value) => {
-    setRelationships(relationships.map(rel => 
-      rel.id === id ? { ...rel, [field]: value } : rel
-    ));
-    
-    // Clear validation error when user changes the field
+    setRelationships(relationships.map(rel => {
+      if (rel.id !== id) return rel;
+      const next = { ...rel, [field]: value };
+      // When selecting a person by ID, clear targetName; when setting targetName, clear targetId
+      if (field === 'targetId') {
+        next.targetName = value ? '' : (next.targetName || '');
+      } else if (field === 'targetName') {
+        next.targetId = value ? null : (next.targetId ?? null);
+      }
+      return next;
+    }));
     if (validationErrors[id]) {
       const newErrors = { ...validationErrors };
       delete newErrors[id];
@@ -211,18 +217,36 @@ const BulkRelationshipInput = ({
     const errors = {};
     let hasErrors = false;
 
+    const basePersonName = (() => {
+      const p = persons.find(px => px.id === basePersonId);
+      return p ? getPersonName(p) : '';
+    })();
+
     relationships.forEach(rel => {
       if (!rel.label) {
         errors[rel.id] = 'Please select a relationship type';
         hasErrors = true;
-      } else if (!rel.targetId) {
-        errors[rel.id] = 'Please select a person';
+        return;
+      }
+      const targetNameTrimmed = (rel.targetName || '').trim();
+      const hasTargetId = !!rel.targetId;
+      const hasTargetName = !!targetNameTrimmed;
+      if (!hasTargetId && !hasTargetName) {
+        errors[rel.id] = 'Please select a person or type a name to create one';
         hasErrors = true;
-      } else if (rel.targetId === basePersonId) {
+        return;
+      }
+      if (hasTargetId && rel.targetId === basePersonId) {
         errors[rel.id] = 'Cannot create relationship to yourself';
         hasErrors = true;
-      } else if (topology) {
-        // Use existing validation
+        return;
+      }
+      if (hasTargetName && basePersonName && targetNameTrimmed.toLowerCase() === basePersonName.toLowerCase()) {
+        errors[rel.id] = 'Cannot create relationship to yourself';
+        hasErrors = true;
+        return;
+      }
+      if (hasTargetId && topology) {
         const validation = validateRelationship(basePersonId, rel.targetId, rel.label, topology);
         if (!validation.valid) {
           errors[rel.id] = validation.errors.join('. ');
@@ -235,27 +259,36 @@ const BulkRelationshipInput = ({
     return !hasErrors;
   };
 
-  // Get preview of relationships to be created
+  // Get preview of relationships to be created (existing persons only; name-only rows show as "new person")
   const getPreview = () => {
-    if (!basePersonId || !topology || relationships.length === 0) {
-      return { edges: [], missingPersons: [], warnings: [] };
+    if (!basePersonId || relationships.length === 0) {
+      return { edges: [], missingPersons: [], warnings: [], newPersonNames: [] };
     }
 
-    const validRelationships = relationships.filter(rel => 
+    const validWithId = relationships.filter(rel =>
       rel.label && rel.targetId && rel.targetId !== basePersonId && !validationErrors[rel.id]
     );
+    const validWithName = relationships.filter(rel =>
+      rel.label && (rel.targetName || '').trim() && !rel.targetId && !validationErrors[rel.id]
+    );
 
-    if (validRelationships.length === 0) {
-      return { edges: [], missingPersons: [], warnings: [] };
+    const newPersonNames = validWithName.map(rel => (rel.targetName || '').trim());
+    if (!topology || validWithId.length === 0) {
+      return {
+        edges: [],
+        missingPersons: [],
+        warnings: [],
+        newPersonNames,
+      };
     }
 
-    const requests = validRelationships.map(rel => ({
+    const requests = validWithId.map(rel => ({
       viewerId: basePersonId,
       targetId: rel.targetId,
       label: rel.label,
     }));
-
-    return translateBulkRelationships(requests, topology);
+    const translated = translateBulkRelationships(requests, topology);
+    return { ...translated, newPersonNames };
   };
 
   const downloadTemplate = () => {
@@ -283,17 +316,17 @@ const BulkRelationshipInput = ({
   const validateCsvRows = (rows) => {
     return rows.map((row, idx) => {
       const rowIndex = idx + 1;
-      const base = row.base_person_name;
+      const base = (row.base_person_name || '').trim();
       const label = row.relationship_label;
-      const target = row.target_person_name;
+      const target = (row.target_person_name || '').trim();
       const viewerId = resolveName(base);
       const targetId = resolveName(target);
       let error = null;
-      if (!viewerId) error = base ? `Person not found: ${base}` : 'Base person name is empty';
-      else if (!targetId) error = target ? `Person not found: ${target}` : 'Target person name is empty';
+      if (!base) error = 'Base person name is empty';
+      else if (!target) error = 'Target person name is empty';
       else if (!allRelationshipLabels.includes(label)) error = `Invalid label: ${label}`;
-      else if (viewerId === targetId) error = 'Same person on both sides';
-      else if (topology) {
+      else if (base.toLowerCase() === target.toLowerCase()) error = 'Same person on both sides';
+      else if (viewerId && targetId && topology) {
         const validation = validateRelationship(viewerId, targetId, label, topology);
         if (!validation.valid) error = validation.errors?.join('. ') || 'Invalid relationship';
       }
@@ -344,7 +377,9 @@ const BulkRelationshipInput = ({
   };
 
   const csvValidRows = useMemo(
-    () => csvRows.filter((r) => !r.error && r.viewerId && r.targetId),
+    () => csvRows.filter(
+      (r) => !r.error && r.base_person_name?.trim() && r.target_person_name?.trim() && r.relationship_label
+    ),
     [csvRows]
   );
 
@@ -367,8 +402,8 @@ const BulkRelationshipInput = ({
     setCreating(true);
     try {
       const relationshipsToSend = csvValidRows.map((r) => ({
-        viewerId: r.viewerId,
-        targetId: r.targetId,
+        viewer_name: (r.base_person_name || '').trim(),
+        target_name: (r.target_person_name || '').trim(),
         label: r.relationship_label,
       }));
       const result = await createBulkRelationships({ familyId, relationships: relationshipsToSend });
@@ -400,32 +435,39 @@ const BulkRelationshipInput = ({
       return;
     }
 
-    const validRelationships = relationships.filter(rel => 
-      rel.label && rel.targetId && rel.targetId !== basePersonId && !validationErrors[rel.id]
-    );
+    const validRelationships = relationships.filter(rel => {
+      if (!rel.label || validationErrors[rel.id]) return false;
+      const hasId = rel.targetId && rel.targetId !== basePersonId;
+      const hasName = (rel.targetName || '').trim();
+      return hasId || hasName;
+    });
 
     if (validRelationships.length === 0) {
       setError('No valid relationships to create');
       return;
     }
 
+    const basePerson = persons.find(p => p.id === basePersonId);
+    const basePersonName = basePerson ? getPersonName(basePerson) : '';
+
+    const relationshipsToSend = validRelationships.map(rel => {
+      const targetNameTrimmed = (rel.targetName || '').trim();
+      if (rel.targetId) {
+        return { viewerId: basePersonId, targetId: rel.targetId, label: rel.label };
+      }
+      return { viewer_name: basePersonName, target_name: targetNameTrimmed, label: rel.label };
+    });
+
     setCreating(true);
 
     try {
-      const requests = validRelationships.map(rel => ({
-        viewerId: basePersonId,
-        targetId: rel.targetId,
-        label: rel.label,
-      }));
-
       const result = await createBulkRelationships({
         familyId,
-        relationships: requests,
+        relationships: relationshipsToSend,
       });
 
       setSuccess(true);
 
-      // Show success message briefly, then close
       setTimeout(() => {
         if (onSuccess) {
           onSuccess();
@@ -434,7 +476,7 @@ const BulkRelationshipInput = ({
       }, 2000);
     } catch (err) {
       console.error('Error creating bulk relationships:', err);
-      const errorMessage = err.response?.data?.error || 
+      const errorMessage = err.response?.data?.error ||
         (err.response?.data?.failed && err.response.data.failed.length > 0
           ? `${err.response.data.failed.length} relationship(s) failed. ${err.response.data.failed.map(f => f.error).join('; ')}`
           : null) ||
@@ -652,16 +694,43 @@ const BulkRelationshipInput = ({
 
                           <Autocomplete
                             sx={{ minWidth: 200, flex: 1 }}
+                            freeSolo
                             options={persons.filter(p => p.id !== basePersonId)}
-                            getOptionLabel={(option) => getPersonName(option)}
-                            value={targetPerson || null}
+                            getOptionLabel={(option) => (typeof option === 'string' ? option : getPersonName(option))}
+                            value={rel.targetId ? (targetPerson || null) : ((rel.targetName || '').trim() || null)}
                             onChange={(event, newValue) => {
-                              handleRelationshipChange(rel.id, 'targetId', newValue?.id || null);
+                              if (newValue && typeof newValue === 'object' && newValue.id) {
+                                setRelationships(relationships.map(r =>
+                                  r.id === rel.id ? { ...r, targetId: newValue.id, targetName: '' } : r
+                                ));
+                              } else {
+                                setRelationships(relationships.map(r =>
+                                  r.id === rel.id ? { ...r, targetId: null, targetName: typeof newValue === 'string' ? newValue : '' } : r
+                                ));
+                              }
+                              if (validationErrors[rel.id]) {
+                                const newErrors = { ...validationErrors };
+                                delete newErrors[rel.id];
+                                setValidationErrors(newErrors);
+                              }
+                            }}
+                            onInputChange={(event, value, reason) => {
+                              if (reason === 'input' && typeof value === 'string') {
+                                setRelationships(relationships.map(r =>
+                                  r.id === rel.id ? { ...r, targetId: null, targetName: value } : r
+                                ));
+                                if (validationErrors[rel.id]) {
+                                  const newErrors = { ...validationErrors };
+                                  delete newErrors[rel.id];
+                                  setValidationErrors(newErrors);
+                                }
+                              }
                             }}
                             renderInput={(params) => (
                               <TextField
                                 {...params}
-                                label="Person"
+                                label="Person or type name to create"
+                                placeholder="Select or type new name"
                                 error={!!error}
                                 disabled={creating}
                               />
@@ -691,19 +760,20 @@ const BulkRelationshipInput = ({
             </Box>
 
             {/* Preview Section */}
-            {basePersonId && relationships.length > 0 && preview.edges.length > 0 && (
+            {basePersonId && relationships.length > 0 && (preview.edges.length > 0 || (preview.newPersonNames && preview.newPersonNames.length > 0)) && (
               <>
                 <Divider sx={{ my: 2 }} />
                 <Box>
                   <Typography variant="subtitle2" gutterBottom>
-                    Preview: Relationships to be created ({preview.edges.length})
+                    Preview: Relationships to be created
+                    ({preview.edges.length + (preview.newPersonNames?.length || 0)})
                   </Typography>
                   <List dense>
                     {preview.edges.map((edge, index) => {
                       const fromPerson = persons.find(p => p.id === edge.from);
                       const toPerson = persons.find(p => p.id === edge.to);
                       return (
-                        <ListItem key={index}>
+                        <ListItem key={`edge-${index}`}>
                           <ListItemText
                             primary={
                               <Box display="flex" alignItems="center" gap={1}>
@@ -725,6 +795,20 @@ const BulkRelationshipInput = ({
                         </ListItem>
                       );
                     })}
+                    {preview.newPersonNames?.map((name, index) => (
+                      <ListItem key={`new-${index}`}>
+                        <ListItemText
+                          primary={
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Typography variant="body2">{basePerson ? getPersonName(basePerson) : 'Base'}</Typography>
+                              <Typography variant="body2" color="text.secondary">→</Typography>
+                              <Typography variant="body2" color="primary">{name}</Typography>
+                              <Chip label="New person + relationship" size="small" color="info" />
+                            </Box>
+                          }
+                        />
+                      </ListItem>
+                    ))}
                   </List>
                 </Box>
               </>
@@ -791,10 +875,10 @@ const BulkRelationshipInput = ({
           <Button
             onClick={handleCreate}
             variant="contained"
-            disabled={creating || !basePersonId || relationships.length === 0}
+            disabled={creating || !basePersonId || relationships.length === 0 || relationships.filter(r => r.label && !validationErrors[r.id] && (r.targetId && r.targetId !== basePersonId || (r.targetName || '').trim())).length === 0}
             startIcon={creating ? <CircularProgress size={20} /> : <PersonAddIcon />}
           >
-            {creating ? 'Creating...' : `Create ${relationships.filter(r => r.label && r.targetId).length} Relationship(s)`}
+            {creating ? 'Creating...' : `Create ${relationships.filter(r => r.label && !validationErrors[r.id] && (r.targetId && r.targetId !== basePersonId || (r.targetName || '').trim())).length} Relationship(s)`}
           </Button>
         )}
       </DialogActions>

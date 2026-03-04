@@ -5,12 +5,12 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
-from apps.graph.models import Person, Relationship, RelationshipTypeChoices
+from apps.graph.models import Person, Relationship, RelationshipTypeChoices, GenderChoices
 from apps.graph.serializers import PersonSerializer, RelationshipSerializer, RelationshipSuggestionSerializer, BulkFamilyUnitSerializer, BulkRelationshipSerializer
 from apps.graph.services.relationship_service import add_parent, add_spouse, delete_relationship
 from apps.graph.services.relationship_suggestions import get_related_suggestions
 from apps.graph.services.relationship_completion import analyze_missing_relationships
-from apps.graph.services.bulk_relationship_service import create_family_unit, create_bulk_relationships
+from apps.graph.services.bulk_relationship_service import create_family_unit, create_bulk_relationships, resolve_or_create_person
 
 
 def is_family_admin(user, family):
@@ -30,6 +30,43 @@ def is_family_member(user, family):
         return FamilyMembership.objects.filter(user=user, family=family).exists()
     except:
         return False
+
+
+# Labels that imply the "from" person (parent/grandparent/in-law parent) in PARENT_OF is female/male
+_PARENT_OF_FROM_FEMALE = {'mother', 'grandmother', 'mother-in-law'}
+_PARENT_OF_FROM_MALE = {'father', 'grandfather', 'father-in-law'}
+# Labels that imply the "to" person (child/sibling/uncle/etc.) in PARENT_OF is female/male
+_PARENT_OF_TO_FEMALE = {'daughter', 'granddaughter', 'sister', 'aunt', 'niece', 'sister-in-law', 'daughter-in-law'}
+_PARENT_OF_TO_MALE = {'son', 'grandson', 'brother', 'uncle', 'nephew', 'brother-in-law', 'son-in-law'}
+# SPOUSE_OF: "to" person is the spouse being added (e.g. "add X as my wife" -> to_person is X)
+_SPOUSE_OF_TO_FEMALE = {'wife'}
+_SPOUSE_OF_TO_MALE = {'husband'}
+
+
+def _apply_gender_from_label(label, relationship_type, from_person, to_person):
+    """Set person gender when relationship is created with a gender-specific label."""
+    if not label:
+        return
+    if relationship_type == RelationshipTypeChoices.PARENT_OF:
+        if label in _PARENT_OF_FROM_FEMALE:
+            from_person.gender = GenderChoices.FEMALE
+            from_person.save(update_fields=['gender', 'updated_at'])
+        elif label in _PARENT_OF_FROM_MALE:
+            from_person.gender = GenderChoices.MALE
+            from_person.save(update_fields=['gender', 'updated_at'])
+        elif label in _PARENT_OF_TO_FEMALE:
+            to_person.gender = GenderChoices.FEMALE
+            to_person.save(update_fields=['gender', 'updated_at'])
+        elif label in _PARENT_OF_TO_MALE:
+            to_person.gender = GenderChoices.MALE
+            to_person.save(update_fields=['gender', 'updated_at'])
+    elif relationship_type == RelationshipTypeChoices.SPOUSE_OF:
+        if label in _SPOUSE_OF_TO_FEMALE:
+            to_person.gender = GenderChoices.FEMALE
+            to_person.save(update_fields=['gender', 'updated_at'])
+        elif label in _SPOUSE_OF_TO_MALE:
+            to_person.gender = GenderChoices.MALE
+            to_person.save(update_fields=['gender', 'updated_at'])
 
 
 class PersonView(APIView):
@@ -151,12 +188,24 @@ class RelationshipView(APIView):
         try:
             if relationship_type == RelationshipTypeChoices.PARENT_OF:
                 relationship = add_parent(family, from_person, to_person)
+                _apply_gender_from_label(
+                    (serializer.validated_data.get('label') or '').strip().lower(),
+                    relationship_type,
+                    from_person,
+                    to_person,
+                )
                 return Response(
                     RelationshipSerializer(relationship).data,
                     status=status.HTTP_201_CREATED
                 )
             elif relationship_type == RelationshipTypeChoices.SPOUSE_OF:
                 relationship_ab, relationship_ba = add_spouse(family, from_person, to_person)
+                _apply_gender_from_label(
+                    (serializer.validated_data.get('label') or '').strip().lower(),
+                    relationship_type,
+                    from_person,
+                    to_person,
+                )
                 # Return both relationships
                 return Response(
                     {
@@ -421,12 +470,14 @@ class RelationshipCompletionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Convert to integers
+        # Convert to integers (person_id optional; omit or empty means analyze all persons)
         try:
             family_id = int(family_id)
-            if person_id:
+            if person_id not in (None, '', 'null'):
                 person_id = int(person_id)
-        except ValueError:
+            else:
+                person_id = None
+        except (ValueError, TypeError):
             return Response(
                 {'error': 'family_id and person_id must be valid integers'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -540,7 +591,28 @@ class BulkRelationshipView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        relationship_requests = serializer.validated_data['relationships']
+        # Resolve names to IDs (create missing persons) only after admin check
+        raw_relationships = serializer.validated_data['relationships']
+        relationship_requests = []
+        for rel in raw_relationships:
+            if 'viewer_id' in rel:
+                relationship_requests.append(rel)
+            else:
+                try:
+                    viewer_person = resolve_or_create_person(family, rel['viewer_name'])
+                    target_person = resolve_or_create_person(family, rel['target_name'])
+                    if viewer_person.id == target_person.id:
+                        return Response(
+                            {'error': 'Viewer and target cannot be the same person.'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    relationship_requests.append({
+                        'viewer_id': viewer_person.id,
+                        'target_id': target_person.id,
+                        'label': rel['label'],
+                    })
+                except ValidationError as e:
+                    return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
         result = create_bulk_relationships(family, relationship_requests)
         

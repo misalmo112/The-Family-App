@@ -293,7 +293,7 @@ const PersonProfile = () => {
   // Redirect to family selection if no active family (unless showing all families)
   useEffect(() => {
     if (!activeFamilyId && !checkingAuthor && !showAllFamilies) {
-      navigate('/families');
+      navigate('/app/families');
     }
   }, [activeFamilyId, navigate, checkingAuthor, showAllFamilies]);
 

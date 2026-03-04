@@ -27,15 +27,17 @@ const Register = () => {
   const [gender, setGender] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (only after loading is complete)
   useEffect(() => {
+    if (isLoading) return; // Wait for auth state to be determined
+    
     if (isAuthenticated) {
-      navigate('/families');
+      navigate('/app/families');
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isLoading, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -62,7 +64,7 @@ const Register = () => {
           await getHealth();
           navigate('/superadmin');
         } catch (err) {
-          navigate('/families');
+          navigate('/app/families');
         }
       } else {
         // Registration succeeded but login failed - redirect to login page
@@ -83,6 +85,25 @@ const Register = () => {
       setLoading(false);
     }
   };
+
+  // Show loading while checking auth state
+  if (isLoading) {
+    return (
+      <Container maxWidth="sm">
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100vh',
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="sm">

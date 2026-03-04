@@ -174,10 +174,10 @@ const JoinFamily = () => {
                   Your profile information will be used to create your person in the family. You can update your details in your{' '}
                   <Button
                     component="a"
-                    href="/profile"
+                    href="/app/profile"
                     onClick={(e) => {
                       e.preventDefault();
-                      navigate('/profile');
+                      navigate('/app/profile');
                     }}
                     sx={{ textTransform: 'none', p: 0, minWidth: 'auto', verticalAlign: 'baseline' }}
                   >
@@ -191,7 +191,7 @@ const JoinFamily = () => {
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 3 }}>
               <Button
                 variant="outlined"
-                onClick={() => navigate('/families')}
+                onClick={() => navigate('/app/families')}
                 disabled={loading}
               >
                 Cancel

@@ -47,7 +47,7 @@ const Families = () => {
 
   const handleSelectFamily = (family) => {
     setActiveFamily(family.id, family.name);
-    navigate('/feed');
+    navigate('/app/feed');
   };
 
   if (loading) {

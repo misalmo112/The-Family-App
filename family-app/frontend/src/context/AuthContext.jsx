@@ -14,14 +14,35 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize token from localStorage on mount
+  // Initialize and validate token from localStorage on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    if (storedToken) {
-      setToken(storedToken);
-      setIsAuthenticated(true);
-    }
+    const validateToken = async () => {
+      const storedToken = localStorage.getItem('token');
+      if (!storedToken) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Validate the token by making a request to the user profile endpoint
+        const response = await api.get('/api/auth/me/');
+        if (response.status === 200) {
+          setToken(storedToken);
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        // Token is invalid or expired, clear it
+        localStorage.removeItem('token');
+        setToken(null);
+        setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    validateToken();
   }, []);
 
   const login = async (username, password) => {
@@ -62,6 +83,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     token,
     isAuthenticated,
+    isLoading,
     login,
     logout,
   };
