@@ -46,6 +46,8 @@ const BulkFamilyUnit = ({
   // Parent 1 & 2: either person object (existing) or string (new name to create)
   const [parent1, setParent1] = useState(null);
   const [parent2, setParent2] = useState(null);
+  const [parent1Input, setParent1Input] = useState(''); // current typed text (used on submit if value not set)
+  const [parent2Input, setParent2Input] = useState('');
   const [selectedChildren, setSelectedChildren] = useState([]); // array of person | string
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
@@ -56,6 +58,8 @@ const BulkFamilyUnit = ({
     if (open) {
       setParent1(null);
       setParent2(null);
+      setParent1Input('');
+      setParent2Input('');
       setSelectedChildren([]);
       setError(null);
       setSuccess(false);
@@ -66,8 +70,10 @@ const BulkFamilyUnit = ({
   const parent2Id = parent2 && typeof parent2 === 'object' && parent2.id != null ? parent2.id : null;
 
   const handleCreate = async () => {
-    const hasParent1 = parent1 != null && (typeof parent1 === 'string' ? parent1.trim() : true);
-    const hasParent2 = parent2 != null && (typeof parent2 === 'string' ? parent2.trim() : true);
+    const name1 = typeof parent1 === 'string' ? parent1.trim() : (parent1 ? null : parent1Input.trim());
+    const name2 = typeof parent2 === 'string' ? parent2.trim() : (parent2 ? null : parent2Input.trim());
+    const hasParent1 = (parent1 != null && (typeof parent1 === 'string' ? parent1.trim() : true)) || (parent1Input || '').trim();
+    const hasParent2 = (parent2 != null && (typeof parent2 === 'string' ? parent2.trim() : true)) || (parent2Input || '').trim();
     if (!hasParent1 && !hasParent2) {
       setError('Please select or enter at least one parent');
       return;
@@ -87,8 +93,8 @@ const BulkFamilyUnit = ({
         familyId,
         parent1Id: parent1Id || null,
         parent2Id: parent2Id || null,
-        parent1Name: typeof parent1 === 'string' ? parent1.trim() : undefined,
-        parent2Name: typeof parent2 === 'string' ? parent2.trim() : undefined,
+        parent1Name: name1 || undefined,
+        parent2Name: name2 || undefined,
         childrenIds: validChildren.filter(c => typeof c === 'object').map(c => c.id),
         childrenNames: validChildren.filter(c => typeof c === 'string').map(s => s.trim()),
       };
@@ -180,7 +186,7 @@ const BulkFamilyUnit = ({
               </Alert>
             )}
 
-            {/* Parent 1: select existing or type name to create */}
+            {/* Parent 1: select existing or type name to create — press Enter to confirm typed name */}
             <Typography variant="subtitle2" gutterBottom sx={{ mt: 0 }}>
               Parent 1 *
             </Typography>
@@ -190,17 +196,35 @@ const BulkFamilyUnit = ({
               getOptionLabel={(option) => getPersonName(option)}
               value={parent1}
               onChange={(event, newValue) => setParent1(newValue ?? null)}
+              onInputChange={(event, value) => setParent1Input(value ?? '')}
+              filterOptions={(options, state) => {
+                const input = (state.inputValue || '').trim();
+                const filtered = input
+                  ? options.filter((opt) =>
+                      getPersonName(opt).toLowerCase().includes(input.toLowerCase())
+                    )
+                  : [...options];
+                if (input && getPersonName(parent1) !== input) {
+                  filtered.push(input);
+                }
+                return filtered;
+              }}
+              isOptionEqualToValue={(option, value) => {
+                if (typeof option === 'string' && typeof value === 'string') return option === value;
+                if (option?.id != null && value?.id != null) return option.id === value.id;
+                return option === value;
+              }}
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  placeholder="Select or type name (e.g. John Smith)"
+                  placeholder="Select or type name, then press Enter (e.g. John Smith)"
                   variant="outlined"
                 />
               )}
               sx={{ mb: 2 }}
             />
 
-            {/* Parent 2: select existing or type name to create */}
+            {/* Parent 2: select existing or type name to create — press Enter to confirm typed name */}
             <Typography variant="subtitle2" gutterBottom>
               Parent 2 (Optional)
             </Typography>
@@ -210,10 +234,28 @@ const BulkFamilyUnit = ({
               getOptionLabel={(option) => getPersonName(option)}
               value={parent2}
               onChange={(event, newValue) => setParent2(newValue ?? null)}
+              onInputChange={(event, value) => setParent2Input(value ?? '')}
+              filterOptions={(options, state) => {
+                const input = (state.inputValue || '').trim();
+                const filtered = input
+                  ? options.filter((opt) =>
+                      getPersonName(opt).toLowerCase().includes(input.toLowerCase())
+                    )
+                  : [...options];
+                if (input && getPersonName(parent2) !== input) {
+                  filtered.push(input);
+                }
+                return filtered;
+              }}
+              isOptionEqualToValue={(option, value) => {
+                if (typeof option === 'string' && typeof value === 'string') return option === value;
+                if (option?.id != null && value?.id != null) return option.id === value.id;
+                return option === value;
+              }}
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  placeholder="Select or type name"
+                  placeholder="Select or type name, then press Enter"
                   variant="outlined"
                 />
               )}

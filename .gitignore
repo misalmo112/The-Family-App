@@ -19,7 +19,8 @@ db.sqlite3-journal
 .env
 .env.local
 
-# IDE
+# IDE / Editor
+.cursor/
 .vscode/
 .idea/
 *.swp

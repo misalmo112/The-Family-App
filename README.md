@@ -1,768 +1,259 @@
-# Family Social Network - Django DRF Backend
+# The Family App
 
-A Django REST Framework backend for a family social network application with JWT authentication and PostgreSQL database.
+A **family social network** with a Django REST backend (JWT auth, PostgreSQL) and an optional React frontend. Create families, manage members and relationships, join via invite codes, and use a family feed (posts, announcements, comments).
 
-## Quick Start
+---
 
-Get the project up and running in minutes:
+## Contents
 
-### Backend Setup
+- [Quick start](#quick-start)
+- [Prerequisites](#prerequisites)
+- [Setup (step by step)](#setup-step-by-step)
+- [Testing the setup](#testing-the-setup)
+- [Running the app](#running-the-app)
+- [API overview](#api-overview)
+- [Running tests](#running-tests)
+- [Project structure](#project-structure)
+- [Development notes](#development-notes)
+- [Agent prompts](#agent-prompts)
 
-1. **Start the database:**
+---
+
+## Quick start
+
+From the **project root**:
+
+1. **Start the database**
    ```bash
    docker compose up -d
    ```
 
-2. **Set up the backend:**
+2. **Backend**
    ```bash
    cd family-app/backend
    python -m venv venv
-   # Activate venv (Windows PowerShell: .\venv\Scripts\Activate.ps1)
+   # Activate: Windows PowerShell → .\venv\Scripts\Activate.ps1  |  macOS/Linux → source venv/bin/activate
    pip install -r requirements.txt
    cp .env.example .env
    python manage.py migrate
    python manage.py createsuperuser
-   ```
-
-3. **Start the server:**
-   ```bash
    python manage.py runserver
    ```
+   Backend: **http://127.0.0.1:8000/**
 
-4. **Verify it's working:**
-   ```bash
-   curl http://127.0.0.1:8000/health/
-   ```
-
-The backend server will be running at `http://127.0.0.1:8000/`
-
-### Frontend Setup (Optional)
-
-1. **Navigate to frontend directory:**
+3. **Frontend (optional)**
    ```bash
    cd family-app/frontend
-   ```
-
-2. **Install dependencies:**
-   ```bash
    npm install
-   ```
-
-3. **Start the development server:**
-   ```bash
    npm run dev
    ```
+   Frontend: **http://localhost:5173/** (ensure backend is running first)
 
-The frontend will be available at `http://localhost:5173/` (or the port shown in the terminal)
-
-**Note:** Make sure the backend is running before starting the frontend. The frontend is configured to connect to `http://127.0.0.1:8000/` by default.
-
-For detailed setup instructions, see the [Setup Instructions](#setup-instructions) section below.
+---
 
 ## Prerequisites
 
-- Python 3.11 or higher
-- Docker and Docker Compose
-- pip (Python package manager)
+- **Python** 3.11+
+- **Docker** and **Docker Compose** (for PostgreSQL)
+- **Node.js** and **npm** (only if you run the frontend)
 
-## Setup Instructions
+---
 
-### 1. Start PostgreSQL Database
+## Setup (step by step)
 
-From the project root, start the PostgreSQL container:
+### 1. Start PostgreSQL
+
+From the project root:
 
 ```bash
 docker compose up -d
+docker ps   # verify container is running
 ```
 
-Verify the container is running:
-
-```bash
-docker ps
-```
-
-### 2. Set Up Python Virtual Environment
-
-Navigate to the backend directory and create a virtual environment:
+### 2. Backend: virtual environment and dependencies
 
 ```bash
 cd family-app/backend
 python -m venv venv
 ```
 
-Activate the virtual environment:
+Activate the venv:
 
-**Windows (PowerShell):**
-```powershell
-.\venv\Scripts\Activate.ps1
-```
+| Platform | Command |
+|----------|---------|
+| Windows (PowerShell) | `.\venv\Scripts\Activate.ps1` |
+| Windows (CMD) | `venv\Scripts\activate.bat` |
+| macOS / Linux | `source venv/bin/activate` |
 
-**Windows (Command Prompt):**
-```cmd
-venv\Scripts\activate.bat
-```
-
-**macOS/Linux:**
-```bash
-source venv/bin/activate
-```
-
-### 3. Install Dependencies
-
-Install all required Python packages:
+Then:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure Environment Variables
-
-Copy the example environment file:
+### 3. Environment variables
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` if you need to change any default values (database credentials, etc.).
+Edit `.env` if you need different database credentials or settings. Defaults (e.g. `family_user` / `family_pass`) are for **local development only**.
 
-### 5. Run Database Migrations
-
-Create migrations for the custom user model and other apps:
-
-```bash
-python manage.py makemigrations
-```
-
-Apply migrations to the database:
+### 4. Database migrations
 
 ```bash
 python manage.py migrate
 ```
 
-### 6. Create Superuser
+(Use `python manage.py makemigrations` only when you change models.)
 
-Create an admin user to access the Django admin panel:
+### 5. Create an admin user
 
 ```bash
 python manage.py createsuperuser
 ```
 
-Follow the prompts to set a username, email, and password.
+Use this account for Django admin and for JWT login.
 
-### 7. Run Development Server
+### 6. Run the backend server
 
-Start the Django development server:
-
-**Windows (Recommended):**
+**Windows (recommended, avoids autoreloader issues):**
 ```powershell
-# Use the provided PowerShell script to avoid autoreloader issues
 .\start_server.ps1
-
-# Or manually with --noreload flag:
-python manage.py runserver 127.0.0.1:8000 --noreload
+# or: python manage.py runserver 127.0.0.1:8000 --noreload
 ```
 
-**macOS/Linux:**
+**macOS / Linux:**
 ```bash
 python manage.py runserver
 ```
 
-**Note for Windows users:** If the server hangs after "System check identified no issues", this is a known Windows issue with Django's autoreloader. Use the `--noreload` flag or the `start_server.ps1` script. With `--noreload`, you'll need to manually restart the server after code changes.
+Server: **http://127.0.0.1:8000/**
 
-The server will be available at `http://127.0.0.1:8000/`
+---
 
-## Testing the Setup
+## Testing the setup
 
-### Health Check Endpoint
+- **Health:** `curl http://127.0.0.1:8000/health/` → `{"status": "ok"}`
+- **JWT login:**  
+  `curl -X POST http://127.0.0.1:8000/api/auth/token/ -H "Content-Type: application/json" -d '{"username":"YOUR_USER","password":"YOUR_PASS"}'`
+- **Registration:**  
+  `POST /api/auth/register/` with JSON body (username, email, password, password_confirm, first_name, last_name, dob, gender). See [API overview](#api-overview) for more.
 
-Test that the server is running:
+---
 
-```bash
-curl http://127.0.0.1:8000/health/
-```
+## Running the app
 
-Expected response:
-```json
-{"status": "ok"}
-```
+- **Backend only:** run Django as in [Setup step 6](#6-run-the-backend-server); use API with curl/Postman or the frontend elsewhere.
+- **Backend + frontend:** start backend first, then in `family-app/frontend` run `npm run dev`. Frontend talks to `http://127.0.0.1:8000/` by default.
 
-### JWT Authentication
+---
 
-Obtain JWT tokens using your superuser credentials:
+## API overview
 
-```bash
-curl -X POST http://127.0.0.1:8000/api/auth/token/ \
-  -H "Content-Type: application/json" \
-  -d '{"username": "your_username", "password": "your_password"}'
-```
+| Area | Endpoints |
+|------|-----------|
+| **Auth** | `POST /api/auth/token/`, `POST /api/auth/token/refresh/`, `POST /api/auth/register/`, `GET/PATCH /api/auth/me/`, `POST /api/auth/change-password/` |
+| **Families** | `GET/POST /api/families/`, `POST /api/families/join/`, `GET /api/families/join-requests/`, approve/reject join requests |
+| **Graph** | `GET/POST /api/graph/persons/?family_id=`, `POST /api/graph/relationships/`, `GET /api/graph/topology/?family_id=&viewer_person_id=` |
+| **Feed** | `POST /api/feed/posts/`, `GET /api/feed/?family_id=` (paginated) |
+| **Admin** | `GET /api/admin/health/`, stats, users, families, logs, feedback (superadmin only) |
 
-Expected response:
-```json
-{
-  "access": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGc..."
-}
-```
+Full request/response examples and curl samples are in the sections below (e.g. [Phase 1 API usage](#phase-1-api-usage), [Feed API usage](#feed-api-usage)). See also `CODE_STRUCTURE.md` for app layout and conventions.
 
-Refresh the access token:
+### Phase 1 API usage
 
-```bash
-curl -X POST http://127.0.0.1:8000/api/auth/token/refresh/ \
-  -H "Content-Type: application/json" \
-  -d '{"refresh": "your_refresh_token"}'
-```
+- **Create family:** `POST /api/families/` with `{"name": "The Smith Family"}` (Bearer token). You become admin; a Person is created from your profile.
+- **Join family:** `POST /api/families/join/` with `{"code": "FAMILY_CODE"}` (and optional `chosen_person_id` or `new_person_payload`).
+- **List join requests (admin):** `GET /api/families/join-requests/`. Approve: `POST /api/families/join-requests/<id>/approve/`.
+- **Persons:** `POST /api/graph/persons/` (admin), `GET /api/graph/persons/?family_id=<id>`.
 
-### User Registration
+### Phase 2 API usage
 
-Register a new user account:
+- **Create relationship:** `POST /api/graph/relationships/` with `family_id`, `type` (e.g. `PARENT_OF`, `SPOUSE_OF`), `from_person_id`, `to_person_id`.
+- **Topology:** `GET /api/graph/topology/?family_id=&viewer_person_id=`.
 
-```bash
-curl -X POST http://127.0.0.1:8000/api/auth/register/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "johndoe",
-    "email": "john@example.com",
-    "password": "securepass123",
-    "password_confirm": "securepass123",
-    "first_name": "John",
-    "last_name": "Doe",
-    "dob": "1990-01-15",
-    "gender": "MALE"
-  }'
-```
+### Feed API usage
 
-Expected response:
-```json
-{
-  "user": {
-    "id": 1,
-    "username": "johndoe",
-    "email": "john@example.com",
-    "first_name": "John",
-    "last_name": "Doe",
-    "dob": "1990-01-15",
-    "gender": "MALE",
-    "date_joined": "2024-01-01T12:00:00Z"
-  },
-  "tokens": {
-    "access": "...",
-    "refresh": "..."
-  }
-}
-```
+- **Create post:** `POST /api/feed/posts/` with `family_id`, `type` (`POST` or `ANNOUNCEMENT`), `text`, optional `author_person_id`, `image_url`.
+- **List posts:** `GET /api/feed/?family_id=1&page=1` (paginated, newest first).
 
-**Note:** Registration automatically returns JWT tokens, so you can immediately use the access token for authenticated requests.
+### Superadmin
 
-### User Profile Management
+- Grant superadmin: Django admin → Users → user → check “Is superadmin”, or via shell: `User.objects.get(username='...').is_superadmin = True` then `save()`.
+- Admin API: `/api/admin/` (health, stats, users, families, logs, feedback). All require JWT with a superadmin user.
 
-**Get Profile:**
-```bash
-curl -X GET http://127.0.0.1:8000/api/auth/me/ \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
+---
 
-**Update Profile:**
-```bash
-curl -X PATCH http://127.0.0.1:8000/api/auth/me/ \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "first_name": "Jane",
-    "dob": "1992-05-20"
-  }'
-```
+## Running tests
 
-**Change Password:**
-```bash
-curl -X POST http://127.0.0.1:8000/api/auth/change-password/ \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "old_password": "oldpass123",
-    "new_password": "newpass456",
-    "new_password_confirm": "newpass456"
-  }'
-```
-
-## Phase 1 API Usage
-
-### Creating a Family
-
-Create a new family (you will automatically become the admin). Your user profile information (first_name, last_name, dob, gender) will be used to create your Person node in the family:
+From `family-app/backend` (with venv active and DB running):
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/families/ \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{"name": "The Smith Family"}'
-```
-
-**Note:** The Person node for the family creator is automatically created using the user's profile data. Make sure your profile is up to date in `/api/auth/me/`.
-
-Expected response:
-```json
-{
-  "id": 1,
-  "name": "The Smith Family",
-  "code": "A1B2C3D4",
-  "created_by": "username",
-  "created_at": "2024-01-01T12:00:00Z",
-  "updated_at": "2024-01-01T12:00:00Z"
-}
-```
-
-### Listing Families
-
-List all families you belong to:
-
-```bash
-curl -X GET http://127.0.0.1:8000/api/families/ \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-Expected response:
-```json
-[
-  {
-    "id": 1,
-    "name": "The Smith Family",
-    "code": "A1B2C3D4",
-    "created_by": "username",
-    "created_at": "2024-01-01T12:00:00Z",
-    "updated_at": "2024-01-01T12:00:00Z"
-  }
-]
-```
-
-### Submitting a Join Request
-
-Submit a request to join a family using the family code. You can either:
-- Use an existing person: provide `chosen_person_id`
-- Create a new person: provide `new_person_payload` (optional - if omitted, your user profile data will be used)
-- Omit both: your user profile data will be used automatically
-
-**Option 1: Join with existing person**
-```bash
-curl -X POST http://127.0.0.1:8000/api/families/join/ \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "code": "A1B2C3D4",
-    "chosen_person_id": 1
-  }'
-```
-
-**Option 2: Join with new person (custom data)**
-```bash
-curl -X POST http://127.0.0.1:8000/api/families/join/ \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "code": "A1B2C3D4",
-    "new_person_payload": {
-      "first_name": "John",
-      "last_name": "Doe",
-      "dob": "1990-01-01",
-      "gender": "MALE"
-    }
-  }'
-```
-
-**Option 3: Join using profile data (no payload)**
-```bash
-curl -X POST http://127.0.0.1:8000/api/families/join/ \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "code": "A1B2C3D4"
-  }'
-```
-
-**Note:** If `new_person_payload` is not provided, your user profile data (first_name, last_name, dob, gender) will be used when the join request is approved.
-
-Expected response:
-```json
-{
-  "id": 1,
-  "family": "The Smith Family",
-  "requested_by": "username",
-  "chosen_person_id": 1,
-  "new_person_payload": null,
-  "status": "PENDING",
-  "reviewed_by": null,
-  "created_at": "2024-01-01T12:00:00Z",
-  "updated_at": "2024-01-01T12:00:00Z"
-}
-```
-
-### Listing Join Requests (Admin Only)
-
-List pending join requests for families where you are an admin:
-
-```bash
-curl -X GET http://127.0.0.1:8000/api/families/join-requests/ \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-Expected response:
-```json
-[
-  {
-    "id": 1,
-    "family": {
-      "id": 1,
-      "name": "The Smith Family",
-      "code": "A1B2C3D4",
-      ...
-    },
-    "requested_by": "username",
-    "chosen_person_id": 1,
-    "new_person_payload": null,
-    "status": "PENDING",
-    "reviewed_by": null,
-    "created_at": "2024-01-01T12:00:00Z",
-    "updated_at": "2024-01-01T12:00:00Z"
-  }
-]
-```
-
-### Approving a Join Request (Admin Only)
-
-Approve a join request:
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/families/join-requests/1/approve/ \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-Expected response:
-```json
-{
-  "message": "Join request approved successfully",
-  "membership_id": 1
-}
-```
-
-### Creating a Person (Admin Only)
-
-Create a new person in a family (only family admins can do this):
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/graph/persons/ \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "family": 1,
-    "first_name": "Jane",
-    "last_name": "Smith",
-    "dob": "1985-05-15",
-    "gender": "FEMALE"
-  }'
-```
-
-Expected response:
-```json
-{
-  "id": 1,
-  "family": 1,
-  "first_name": "Jane",
-  "last_name": "Smith",
-  "dob": "1985-05-15",
-  "gender": "FEMALE",
-  "created_at": "2024-01-01T12:00:00Z",
-  "updated_at": "2024-01-01T12:00:00Z"
-}
-```
-
-### Listing Persons
-
-List all persons in a family (family members can view):
-
-```bash
-curl -X GET "http://127.0.0.1:8000/api/graph/persons/?family_id=1" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-Expected response:
-```json
-[
-  {
-    "id": 1,
-    "family": 1,
-    "first_name": "Jane",
-    "last_name": "Smith",
-    "dob": "1985-05-15",
-    "gender": "FEMALE",
-    "created_at": "2024-01-01T12:00:00Z",
-    "updated_at": "2024-01-01T12:00:00Z"
-  }
-]
-```
-
-## Phase 2 API Usage
-
-### Creating a Relationship (Admin Only)
-
-Create a relationship between two persons in the same family. `PARENT_OF` is directional; `SPOUSE_OF` creates two edges (A->B and B->A).
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/graph/relationships/ \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "family_id": 1,
-    "type": "PARENT_OF",
-    "from_person_id": 1,
-    "to_person_id": 2
-  }'
-```
-
-### Fetching Topology
-
-Get the family graph topology (nodes + edges). Spouse edges are not deduped.
-
-```bash
-curl -X GET "http://127.0.0.1:8000/api/graph/topology/?family_id=1&viewer_person_id=1" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-Expected response:
-```json
-{
-  "family_id": 1,
-  "viewer_person_id": 1,
-  "nodes": [
-    {
-      "id": 1,
-      "family": 1,
-      "first_name": "Jane",
-      "last_name": "Smith",
-      "dob": "1985-05-15",
-      "gender": "FEMALE",
-      "created_at": "2024-01-01T12:00:00Z",
-      "updated_at": "2024-01-01T12:00:00Z"
-    }
-  ],
-  "edges": [
-    { "from": 1, "to": 2, "type": "PARENT_OF" }
-  ]
-}
-```
-
-## Running Tests
-
-Run tests using pytest:
-
-```bash
-cd family-app/backend
 pytest
 ```
 
-## Project Structure
+---
 
-See `CODE_STRUCTURE.md` for detailed documentation about the project structure, app responsibilities, and development conventions.
+## Project structure
 
-## API Endpoints
+- **family-app/backend** — Django project (`config/`), apps: `accounts`, `families`, `graph`, `feed`, `core`. See `CODE_STRUCTURE.md`.
+- **family-app/frontend** — React app (Vite).
+- **docker-compose.yml** — PostgreSQL for local development.
 
-### Phase 0 (Basic Setup)
-- `GET /health/` - Health check endpoint
-- `POST /api/auth/token/` - Obtain JWT access and refresh tokens
-- `POST /api/auth/token/refresh/` - Refresh access token
-- `POST /api/auth/register/` - User registration
-- `GET /api/auth/me/` - Get current user profile
-- `PATCH /api/auth/me/` - Update user profile
-- `POST /api/auth/change-password/` - Change password
-- `GET /admin/` - Django admin panel
+---
 
-### Phase 1 (Families & Graph)
-- `GET /api/families/` - List families the user belongs to
-- `POST /api/families/` - Create a new family
-- `POST /api/families/join/` - Submit a join request to a family
-- `GET /api/families/join-requests/` - List pending join requests (admin only)
-- `POST /api/families/join-requests/<id>/approve/` - Approve a join request (admin only)
-- `POST /api/families/join-requests/<id>/reject/` - Reject a join request (admin only)
-- `GET /api/graph/persons/?family_id=<id>` - List persons in a family
-- `POST /api/graph/persons/` - Create a new person (admin only)
+## Development notes
 
-### Phase 2 (Relationships & Topology)
-- `POST /api/graph/relationships/` - Create a relationship (admin only)
-- `GET /api/graph/topology/?family_id=<id>&viewer_person_id=<id>` - Graph topology (nodes + edges)
+- Database data is stored in a Docker volume.
+- Config is via `.env`; never commit real `.env` (use `.env.example` as template).
+- Custom user model: `apps.accounts.models.User`.
+- Put business logic in `services/` inside each app; APIs under `/api/<app>/...`.
 
-### Phase 3 (Feed)
-- `POST /api/feed/posts/` - Create a new post
-- `GET /api/feed/?family_id=<id>` - List posts for a family (with pagination)
+---
 
-## Feed API Usage
+## Agent prompts
 
-### Creating a Post
+Copy-paste these prompts for an AI or script to set up or run the project. Adjust paths and platform if needed.
 
-Create a new post in a family feed (family members only):
+### First-time setup (full)
 
-**Basic post:**
-```bash
-curl -X POST http://127.0.0.1:8000/api/feed/posts/ \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "family_id": 1,
-    "type": "POST",
-    "text": "Hello everyone! How is everyone doing today?"
-  }'
+```
+Set up The Family App from scratch on this machine. Steps:
+1. From the project root, run: docker compose up -d
+2. In family-app/backend: create a Python venv, activate it, run: pip install -r requirements.txt
+3. Copy .env.example to .env in family-app/backend
+4. Run: python manage.py migrate
+5. Run: python manage.py createsuperuser (use interactive prompts or non-interactive if supported)
+6. Optionally in family-app/frontend: npm install
+
+Do not overwrite an existing .env. If .env already exists, skip copying .env.example. Confirm when done what URLs to use (backend 127.0.0.1:8000, frontend localhost:5173).
 ```
 
-**Post with author person:**
-```bash
-curl -X POST http://127.0.0.1:8000/api/feed/posts/ \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "family_id": 1,
-    "author_person_id": 5,
-    "type": "POST",
-    "text": "This is a post from Jane Smith"
-  }'
+### Run backend only
+
+```
+Start the Family App backend. From family-app/backend with virtual environment activated, run the Django dev server (e.g. python manage.py runserver or .\start_server.ps1 on Windows). Ensure Docker PostgreSQL is up (docker compose up -d from project root) and .env exists. Tell me the URL (e.g. http://127.0.0.1:8000/) when ready.
 ```
 
-**Announcement with image:**
-```bash
-curl -X POST http://127.0.0.1:8000/api/feed/posts/ \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "family_id": 1,
-    "type": "ANNOUNCEMENT",
-    "text": "Family reunion next month!",
-    "image_url": "https://example.com/reunion-poster.jpg"
-  }'
+### Run backend and frontend
+
+```
+Start the Family App backend and frontend. First start the Django server from family-app/backend (venv active, DB running). Then start the frontend from family-app/frontend with npm run dev. Report both URLs (backend and frontend) when ready.
 ```
 
-Expected response:
-```json
-{
-  "id": 1,
-  "family_id": 1,
-  "family_name": "The Smith Family",
-  "author_user": "username",
-  "author_person_id": 5,
-  "author_person_name": "Jane Smith",
-  "type": "POST",
-  "text": "Hello everyone! How is everyone doing today?",
-  "image_url": null,
-  "created_at": "2024-01-01T12:00:00Z"
-}
+### Create demo account (optional)
+
+```
+In family-app/backend with venv active and Django server not required: run python manage.py create_demo_account. This creates a demo user (username: demo, password: Demo123!) with sample families and data. If the demo user already exists, use --reset to remove and recreate, or run without --reset to leave existing data. Confirm when done.
 ```
 
-### Listing Posts
+### Troubleshoot “database connection failed”
 
-List posts for a family with pagination (family members only):
-
-```bash
-curl -X GET "http://127.0.0.1:8000/api/feed/?family_id=1&page=1" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+The Family App backend cannot connect to PostgreSQL. Check: (1) docker compose up -d from project root, (2) .env in family-app/backend has DB_HOST=localhost, DB_PORT=5432, DB_NAME=family_app, DB_USER=family_user, DB_PASSWORD=family_pass (or match your docker-compose DB settings), (3) no firewall blocking port 5432. See family-app/backend/TROUBLESHOOTING.md for more. Suggest concrete commands to verify the DB is reachable (e.g. python -c "import psycopg; conn = psycopg.connect(...); conn.close()").
 ```
 
-Expected response:
-```json
-{
-  "results": [
-    {
-      "id": 1,
-      "family_id": 1,
-      "family_name": "The Smith Family",
-      "author_user": "username",
-      "author_person_id": 5,
-      "author_person_name": "Jane Smith",
-      "type": "POST",
-      "text": "Hello everyone! How is everyone doing today?",
-      "image_url": null,
-      "created_at": "2024-01-01T12:00:00Z"
-    }
-  ],
-  "count": 25,
-  "page": 1,
-  "page_size": 20,
-  "total_pages": 2,
-  "has_next": true,
-  "has_previous": false
-}
-```
+---
 
-**Pagination:**
-- Default page size: 20 posts per page
-- Use `page` query parameter to navigate (e.g., `?family_id=1&page=2`)
-- Posts are ordered by newest first (`-created_at`)
-
-**Post Types:**
-- `POST` - Regular post (default)
-- `ANNOUNCEMENT` - Announcement post
-
-**Optional Fields:**
-- `author_person_id` - Associate post with a specific person in the family
-- `image_url` - URL to an image for the post
-
-## Development Notes
-
-- The database runs in a Docker container and persists data in a volume
-- All configuration uses environment variables from `.env`
-- Custom user model is located in `apps.accounts.models.User`
-- Business logic should be placed in `services/` modules within each app
-- API endpoints follow the pattern `/api/<app>/...`
-
-## Superadmin Management
-
-### Granting Superadmin Status
-
-To grant superadmin status to a user, you can use Django shell or admin panel:
-
-**Option 1: Django Shell**
-```bash
-python manage.py shell
-```
-```python
-from apps.accounts.models import User
-user = User.objects.get(username='your_username')
-user.is_superadmin = True
-user.save()
-```
-
-**Option 2: Django Admin Panel**
-1. Navigate to `http://127.0.0.1:8000/admin/`
-2. Go to Users
-3. Select the user
-4. Check the "Is superadmin" checkbox
-5. Save
-
-### Superadmin Endpoints Summary
-
-All endpoints under `/api/admin/` require superadmin status (`is_superadmin=True`).
-
-**Health Check:**
-- `GET /api/admin/health/` - System health check (returns status, time, db status)
-
-**Statistics:**
-- `GET /api/admin/stats/?days=30` - System statistics (users, families, posts, join requests)
-
-**User Management:**
-- `GET /api/admin/users/?q=&page=` - List users with search and pagination
-- `POST /api/admin/users/<id>/disable/` - Disable a user
-- `POST /api/admin/users/<id>/make-superadmin/` - Grant superadmin status
-- `POST /api/admin/users/<id>/revoke-superadmin/` - Revoke superadmin status
-
-**Family Management:**
-- `GET /api/admin/families/?q=&page=` - List families with search and pagination
-- `POST /api/admin/families/<id>/suspend/` - Suspend a family
-- `POST /api/admin/families/<id>/unsuspend/` - Unsuspend a family
-
-**Error Logs:**
-- `GET /api/admin/logs/errors/?q=&page=&since_hours=` - List error logs
-- `GET /api/admin/logs/errors/<id>/` - Get error log detail
-
-**Audit Logs:**
-- `GET /api/admin/logs/audit/?page=&action_type=&entity_type=&family_id=` - List audit logs
-
-**Feedback Management:**
-- `GET /api/admin/feedback/?page=&status=&type=` - List feedback
-- `POST /api/admin/feedback/<id>/status/` - Update feedback status
-
-**Note:** All admin endpoints require JWT authentication with a superadmin user token.
-
+For detailed API examples (curl for auth, families, graph, feed), see the sections above or the full endpoint list under [API overview](#api-overview). For code layout and conventions, see `CODE_STRUCTURE.md`.
