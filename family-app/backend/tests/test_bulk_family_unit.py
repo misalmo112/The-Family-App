@@ -220,6 +220,45 @@ def test_create_family_unit_partial_failure():
 
 
 @pytest.mark.django_db
+def test_create_family_unit_with_names_resolve_or_create():
+    """Test creating a family unit by typing names; persons are created if they don't exist"""
+    User = get_user_model()
+    admin = User.objects.create_user(username="bulk_names", password="pass12345")
+
+    c = APIClient()
+    token = c.post("/api/auth/token/", {"username": "bulk_names", "password": "pass12345"}, format="json").json()["access"]
+    c.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    fam = c.post("/api/families/", {"name": "BulkFamNames"}, format="json").json()
+    family_id = fam["id"]
+
+    # Create family unit using only names (no pre-created persons)
+    bulk_resp = c.post("/api/graph/family-units/", {
+        "family_id": family_id,
+        "parent1_name": "Alice Smith",
+        "parent2_name": "Bob Smith",
+        "children_names": ["Charlie Smith", "Diana Smith"],
+    }, format="json")
+
+    assert bulk_resp.status_code == 201
+    result = bulk_resp.json()
+    assert result["created_count"] == 6  # 2 spouse + 4 parent-child
+
+    # Verify persons were created (creator + 4 from names = 5 total)
+    assert Person.objects.filter(family_id=family_id).count() >= 4
+    alice = Person.objects.get(family_id=family_id, first_name="Alice", last_name="Smith")
+    bob = Person.objects.get(family_id=family_id, first_name="Bob", last_name="Smith")
+    charlie = Person.objects.get(family_id=family_id, first_name="Charlie", last_name="Smith")
+    diana = Person.objects.get(family_id=family_id, first_name="Diana", last_name="Smith")
+
+    relationships = Relationship.objects.filter(family_id=family_id)
+    assert relationships.filter(type=RelationshipTypeChoices.SPOUSE_OF).count() == 2
+    assert relationships.filter(type=RelationshipTypeChoices.PARENT_OF).count() == 4
+    assert relationships.filter(from_person=alice, to_person=charlie, type=RelationshipTypeChoices.PARENT_OF).exists()
+    assert relationships.filter(from_person=bob, to_person=diana, type=RelationshipTypeChoices.PARENT_OF).exists()
+
+
+@pytest.mark.django_db
 def test_bulk_endpoint_requires_admin():
     """Test that bulk endpoint requires admin permissions"""
     User = get_user_model()

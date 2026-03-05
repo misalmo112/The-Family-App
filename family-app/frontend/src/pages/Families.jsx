@@ -80,13 +80,20 @@ const Families = () => {
         <Alert severity="info" sx={{ mb: 3 }}>
           You don't belong to any families yet. Create a family or join one to get started.
         </Alert>
-        <Box sx={{ display: 'flex', gap: 2 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
           <Button
             variant="contained"
             size="large"
-            onClick={() => navigate('/onboarding')}
+            onClick={() => navigate('/onboarding?mode=create')}
           >
-            Get Started
+            Create a family
+          </Button>
+          <Button
+            variant="outlined"
+            size="large"
+            onClick={() => navigate('/onboarding?mode=join')}
+          >
+            Join a family
           </Button>
         </Box>
       </Box>
@@ -95,13 +102,29 @@ const Families = () => {
 
   return (
     <Box>
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Typography variant="h3" component="h1" gutterBottom>
           Your Families
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Choose a family space to enter the chat and timeline.
         </Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+          <Button
+            variant="contained"
+            size="medium"
+            onClick={() => navigate('/onboarding?mode=create')}
+          >
+            Create new family
+          </Button>
+          <Button
+            variant="outlined"
+            size="medium"
+            onClick={() => navigate('/app/join')}
+          >
+            Join a family
+          </Button>
+        </Box>
       </Box>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {families.map((family) => (

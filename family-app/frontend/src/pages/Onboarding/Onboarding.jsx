@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Container,
   Paper,
@@ -25,9 +25,18 @@ import { createFamily, submitJoinRequest } from '../../services/families';
 
 const Onboarding = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { setActiveFamily } = useFamily();
   const { logout } = useAuth();
   const [mode, setMode] = useState(null); // 'create' or 'join'
+
+  // Support ?mode=create or ?mode=join so "Your Families" can link directly to create/join flow
+  useEffect(() => {
+    const urlMode = searchParams.get('mode');
+    if (urlMode === 'create' || urlMode === 'join') {
+      setMode(urlMode);
+    }
+  }, [searchParams]);
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

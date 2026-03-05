@@ -134,18 +134,39 @@ class RelationshipSuggestionSerializer(serializers.Serializer):
 
 
 class BulkFamilyUnitSerializer(serializers.Serializer):
-    """Serializer for bulk family unit creation"""
+    """Serializer for bulk family unit creation.
+    Accepts either IDs or names for parents and children; names are resolved or create Person (like bulk relationships).
+    """
     family_id = serializers.IntegerField()
     parent1_id = serializers.IntegerField(required=False, allow_null=True)
     parent2_id = serializers.IntegerField(required=False, allow_null=True)
+    parent1_name = serializers.CharField(required=False, allow_blank=True)
+    parent2_name = serializers.CharField(required=False, allow_blank=True)
     children_ids = serializers.ListField(
         child=serializers.IntegerField(),
-        min_length=1
+        required=False,
+        default=list
     )
-    
+    children_names = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list
+    )
+
     def validate(self, attrs):
-        if not attrs.get('parent1_id') and not attrs.get('parent2_id'):
-            raise serializers.ValidationError('At least one parent is required')
+        parent1_id = attrs.get('parent1_id')
+        parent2_id = attrs.get('parent2_id')
+        parent1_name = (attrs.get('parent1_name') or '').strip()
+        parent2_name = (attrs.get('parent2_name') or '').strip()
+        children_ids = attrs.get('children_ids') or []
+        children_names = [n.strip() for n in (attrs.get('children_names') or []) if (n or '').strip()]
+
+        has_parent1 = bool(parent1_id or parent1_name)
+        has_parent2 = bool(parent2_id or parent2_name)
+        if not has_parent1 and not has_parent2:
+            raise serializers.ValidationError('At least one parent is required (by ID or name).')
+        if not children_ids and not children_names:
+            raise serializers.ValidationError('At least one child is required (by IDs or names).')
         return attrs
 
 

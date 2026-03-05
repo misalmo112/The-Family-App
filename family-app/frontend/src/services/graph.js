@@ -163,21 +163,41 @@ export const getRelationshipCompletion = async ({ familyId, personId = null }) =
 };
 
 /**
- * Create a family unit (parents + children) in one operation
+ * Create a family unit (parents + children) in one operation.
+ * Accepts either IDs or names; names are resolved or create Person (like bulk relationships).
  * @param {Object} params - Family unit parameters
  * @param {number} params.familyId - The family ID
- * @param {number|null} params.parent1Id - First parent ID (optional)
- * @param {number|null} params.parent2Id - Second parent ID (optional)
- * @param {Array<number>} params.childrenIds - Array of child person IDs
+ * @param {number|null} params.parent1Id - First parent ID (optional if parent1Name provided)
+ * @param {number|null} params.parent2Id - Second parent ID (optional if parent2Name provided)
+ * @param {string} [params.parent1Name] - First parent full name (creates person if not found)
+ * @param {string} [params.parent2Name] - Second parent full name (creates person if not found)
+ * @param {Array<number>} [params.childrenIds] - Array of child person IDs
+ * @param {Array<string>} [params.childrenNames] - Array of child full names (creates persons if not found)
  * @returns {Promise<Object>} Created relationships and result
  */
-export const createFamilyUnit = async ({ familyId, parent1Id, parent2Id, childrenIds }) => {
-  const response = await api.post('/api/graph/family-units/', {
+export const createFamilyUnit = async ({
+  familyId,
+  parent1Id,
+  parent2Id,
+  parent1Name,
+  parent2Name,
+  childrenIds,
+  childrenNames,
+}) => {
+  const payload = {
     family_id: familyId,
-    parent1_id: parent1Id || null,
-    parent2_id: parent2Id || null,
-    children_ids: childrenIds,
-  });
+    parent1_id: parent1Id ?? null,
+    parent2_id: parent2Id ?? null,
+    children_ids: childrenIds ?? [],
+    children_names: childrenNames ?? [],
+  };
+  if ((parent1Name || '').trim()) {
+    payload.parent1_name = parent1Name.trim();
+  }
+  if ((parent2Name || '').trim()) {
+    payload.parent2_name = parent2Name.trim();
+  }
+  const response = await api.post('/api/graph/family-units/', payload);
   return response.data;
 };
 

@@ -9,10 +9,6 @@ import {
   Alert,
   CircularProgress,
   Typography,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Chip,
   List,
   ListItem,
@@ -35,6 +31,11 @@ import { createFamilyUnit } from '../../services/graph';
  * BulkFamilyUnit Component
  * Allows creating an entire family unit (parents + children) in one operation
  */
+const getPersonName = (person) => {
+  if (typeof person === 'string') return person;
+  return `${person?.first_name || ''} ${person?.last_name || ''}`.trim() || `Person ${person?.id}`;
+};
+
 const BulkFamilyUnit = ({
   open,
   onClose,
@@ -42,9 +43,10 @@ const BulkFamilyUnit = ({
   persons,
   onSuccess,
 }) => {
-  const [parent1Id, setParent1Id] = useState(null);
-  const [parent2Id, setParent2Id] = useState(null);
-  const [selectedChildren, setSelectedChildren] = useState([]);
+  // Parent 1 & 2: either person object (existing) or string (new name to create)
+  const [parent1, setParent1] = useState(null);
+  const [parent2, setParent2] = useState(null);
+  const [selectedChildren, setSelectedChildren] = useState([]); // array of person | string
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -52,22 +54,27 @@ const BulkFamilyUnit = ({
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (open) {
-      setParent1Id(null);
-      setParent2Id(null);
+      setParent1(null);
+      setParent2(null);
       setSelectedChildren([]);
       setError(null);
       setSuccess(false);
     }
   }, [open]);
 
+  const parent1Id = parent1 && typeof parent1 === 'object' && parent1.id != null ? parent1.id : null;
+  const parent2Id = parent2 && typeof parent2 === 'object' && parent2.id != null ? parent2.id : null;
+
   const handleCreate = async () => {
-    if (!parent1Id && !parent2Id) {
-      setError('Please select at least one parent');
+    const hasParent1 = parent1 != null && (typeof parent1 === 'string' ? parent1.trim() : true);
+    const hasParent2 = parent2 != null && (typeof parent2 === 'string' ? parent2.trim() : true);
+    if (!hasParent1 && !hasParent2) {
+      setError('Please select or enter at least one parent');
       return;
     }
-
-    if (selectedChildren.length === 0) {
-      setError('Please select at least one child');
+    const validChildren = selectedChildren.filter(c => (typeof c === 'string' ? c.trim() : c));
+    if (validChildren.length === 0) {
+      setError('Please select or enter at least one child');
       return;
     }
 
@@ -76,26 +83,26 @@ const BulkFamilyUnit = ({
     setSuccess(false);
 
     try {
-      const result = await createFamilyUnit({
+      const payload = {
         familyId,
         parent1Id: parent1Id || null,
         parent2Id: parent2Id || null,
-        childrenIds: selectedChildren.map(c => c.id),
-      });
+        parent1Name: typeof parent1 === 'string' ? parent1.trim() : undefined,
+        parent2Name: typeof parent2 === 'string' ? parent2.trim() : undefined,
+        childrenIds: validChildren.filter(c => typeof c === 'object').map(c => c.id),
+        childrenNames: validChildren.filter(c => typeof c === 'string').map(s => s.trim()),
+      };
+      await createFamilyUnit(payload);
 
       setSuccess(true);
-      
-      // Show success message briefly, then close
       setTimeout(() => {
-        if (onSuccess) {
-          onSuccess();
-        }
+        if (onSuccess) onSuccess();
         onClose();
       }, 1500);
     } catch (err) {
       console.error('Error creating family unit:', err);
       setError(
-        err.response?.data?.error || 
+        err.response?.data?.error ||
         err.response?.data?.errors?.join?.('\n') ||
         'Failed to create family unit. Please try again.'
       );
@@ -104,32 +111,28 @@ const BulkFamilyUnit = ({
     }
   };
 
-  const handleRemoveChild = (childId) => {
-    setSelectedChildren(prev => prev.filter(c => c.id !== childId));
+  const handleRemoveChild = (child) => {
+    setSelectedChildren(prev => prev.filter(c => c !== child));
   };
 
-  const getPersonName = (person) => {
-    return `${person.first_name || ''} ${person.last_name || ''}`.trim() || `Person ${person.id}`;
-  };
-
-  // Filter out already selected children from available options
+  // Filter out already selected from available options (for dropdown)
   const availableChildren = persons.filter(
-    p => !selectedChildren.some(c => c.id === p.id) && p.id !== parent1Id && p.id !== parent2Id
+    p => !selectedChildren.some(c => typeof c === 'object' && c?.id === p.id) && p.id !== parent1Id && p.id !== parent2Id
   );
 
-  // Calculate relationships to be created
+  // Preview: resolve display names and relationship count
   const relationshipsToCreate = [];
   if (parent1Id && parent2Id) {
     relationshipsToCreate.push({ type: 'SPOUSE_OF', from: parent1Id, to: parent2Id });
   }
   selectedChildren.forEach(child => {
-    if (parent1Id) {
-      relationshipsToCreate.push({ type: 'PARENT_OF', from: parent1Id, to: child.id });
-    }
-    if (parent2Id) {
-      relationshipsToCreate.push({ type: 'PARENT_OF', from: parent2Id, to: child.id });
+    const childId = typeof child === 'object' && child?.id != null ? child.id : null;
+    if (childId) {
+      if (parent1Id) relationshipsToCreate.push({ type: 'PARENT_OF', from: parent1Id, to: childId });
+      if (parent2Id) relationshipsToCreate.push({ type: 'PARENT_OF', from: parent2Id, to: childId });
     }
   });
+  const newChildCount = selectedChildren.filter(c => typeof c === 'string').length;
 
   return (
     <Dialog 
@@ -163,7 +166,7 @@ const BulkFamilyUnit = ({
       <DialogContent>
         {success ? (
           <Alert severity="success" icon={<CheckCircleIcon />}>
-            Family unit created successfully! Created {relationshipsToCreate.length} relationship(s).
+            Family unit created successfully!
           </Alert>
         ) : (
           <>
@@ -177,61 +180,82 @@ const BulkFamilyUnit = ({
               </Alert>
             )}
 
-            {/* Parent 1 Selection */}
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Parent 1 *</InputLabel>
-              <Select
-                value={parent1Id || ''}
-                onChange={(e) => setParent1Id(e.target.value)}
-                label="Parent 1 *"
-              >
-                {persons
-                  .filter(p => p.id !== parent2Id)
-                  .map(person => (
-                    <MenuItem key={person.id} value={person.id}>
-                      {getPersonName(person)}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
+            {/* Parent 1: select existing or type name to create */}
+            <Typography variant="subtitle2" gutterBottom sx={{ mt: 0 }}>
+              Parent 1 *
+            </Typography>
+            <Autocomplete
+              freeSolo
+              options={persons.filter(p => p.id !== parent2Id)}
+              getOptionLabel={(option) => getPersonName(option)}
+              value={parent1}
+              onChange={(event, newValue) => setParent1(newValue ?? null)}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="Select or type name (e.g. John Smith)"
+                  variant="outlined"
+                />
+              )}
+              sx={{ mb: 2 }}
+            />
 
-            {/* Parent 2 Selection */}
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Parent 2 (Optional)</InputLabel>
-              <Select
-                value={parent2Id || ''}
-                onChange={(e) => setParent2Id(e.target.value || null)}
-                label="Parent 2 (Optional)"
-              >
-                <MenuItem value="">None</MenuItem>
-                {persons
-                  .filter(p => p.id !== parent1Id)
-                  .map(person => (
-                    <MenuItem key={person.id} value={person.id}>
-                      {getPersonName(person)}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
+            {/* Parent 2: select existing or type name to create */}
+            <Typography variant="subtitle2" gutterBottom>
+              Parent 2 (Optional)
+            </Typography>
+            <Autocomplete
+              freeSolo
+              options={persons.filter(p => p.id !== parent1Id)}
+              getOptionLabel={(option) => getPersonName(option)}
+              value={parent2}
+              onChange={(event, newValue) => setParent2(newValue ?? null)}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="Select or type name"
+                  variant="outlined"
+                />
+              )}
+              sx={{ mb: 2 }}
+            />
 
             <Divider sx={{ my: 2 }} />
 
-            {/* Children Selection */}
+            {/* Children: select existing or type names to create */}
             <Typography variant="subtitle2" gutterBottom>
               Children *
             </Typography>
             <Autocomplete
               multiple
+              freeSolo
               options={availableChildren}
               getOptionLabel={(option) => getPersonName(option)}
               value={selectedChildren}
               onChange={(event, newValue) => {
                 setSelectedChildren(newValue);
               }}
+              filterOptions={(options, state) => {
+                const input = (state.inputValue || '').trim();
+                const labelMatch = (opt) =>
+                  getPersonName(opt).toLowerCase().includes(input.toLowerCase());
+                const filtered = input
+                  ? options.filter(labelMatch)
+                  : [...options];
+                if (input && !selectedChildren.some((c) => getPersonName(c) === input)) {
+                  filtered.push(input);
+                }
+                return filtered;
+              }}
+              isOptionEqualToValue={(option, value) => {
+                if (typeof option === 'string' && typeof value === 'string') return option === value;
+                if (option?.id != null && value?.id != null) return option.id === value.id;
+                return option === value;
+              }}
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  placeholder="Select children"
+                  placeholder="Select or type a name and press Enter to add (repeat for more)"
                   variant="outlined"
                 />
               )}
@@ -239,9 +263,9 @@ const BulkFamilyUnit = ({
                 value.map((option, index) => (
                   <Chip
                     {...getTagProps({ index })}
-                    key={option.id}
+                    key={typeof option === 'string' ? `name-${index}-${option}` : option.id}
                     label={getPersonName(option)}
-                    onDelete={() => handleRemoveChild(option.id)}
+                    onDelete={() => handleRemoveChild(option)}
                   />
                 ))
               }
@@ -249,41 +273,42 @@ const BulkFamilyUnit = ({
             />
 
             {/* Preview */}
-            {relationshipsToCreate.length > 0 && (
+            {(relationshipsToCreate.length > 0 || newChildCount > 0) && (
               <Box sx={{ mt: 3 }}>
                 <Typography variant="subtitle2" gutterBottom>
-                  Relationships to be created ({relationshipsToCreate.length}):
+                  {relationshipsToCreate.length > 0
+                    ? `Relationships to be created (${relationshipsToCreate.length})`
+                    : ''}
+                  {newChildCount > 0 && (
+                    <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                      + {newChildCount} new person{newChildCount !== 1 ? 's' : ''} will be created
+                    </Typography>
+                  )}
                 </Typography>
-                <List dense>
-                  {relationshipsToCreate.map((rel, index) => {
-                    const fromPerson = persons.find(p => p.id === rel.from);
-                    const toPerson = persons.find(p => p.id === rel.to);
-                    return (
-                      <ListItem key={index}>
-                        <ListItemText
-                          primary={
-                            <Box display="flex" alignItems="center" gap={1}>
-                              <Typography variant="body2">
-                                {fromPerson ? getPersonName(fromPerson) : `Person ${rel.from}`}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                →
-                              </Typography>
-                              <Typography variant="body2">
-                                {toPerson ? getPersonName(toPerson) : `Person ${rel.to}`}
-                              </Typography>
-                              <Chip
-                                label={rel.type.replace('_', ' ')}
-                                size="small"
-                                color={rel.type === 'PARENT_OF' ? 'primary' : 'secondary'}
-                              />
-                            </Box>
-                          }
-                        />
-                      </ListItem>
-                    );
-                  })}
-                </List>
+                {relationshipsToCreate.length > 0 && (
+                  <List dense>
+                    {relationshipsToCreate.map((rel, index) => {
+                      const fromLabel = rel.from === parent1Id ? getPersonName(parent1) : getPersonName(parent2);
+                      const toPerson = persons.find(p => p.id === rel.to);
+                      const toChild = selectedChildren.find(c => typeof c === 'object' && c?.id === rel.to);
+                      const toLabel = toPerson ? getPersonName(toPerson) : (toChild ? getPersonName(toChild) : `Person ${rel.to}`);
+                      return (
+                        <ListItem key={index}>
+                          <ListItemText
+                            primary={
+                              <Box display="flex" alignItems="center" gap={1}>
+                                <Typography variant="body2">{fromLabel}</Typography>
+                                <Typography variant="body2" color="text.secondary">→</Typography>
+                                <Typography variant="body2">{toLabel}</Typography>
+                                <Chip label={rel.type.replace('_', ' ')} size="small" color={rel.type === 'PARENT_OF' ? 'primary' : 'secondary'} />
+                              </Box>
+                            }
+                          />
+                        </ListItem>
+                      );
+                    })}
+                  </List>
+                )}
               </Box>
             )}
           </>
@@ -298,7 +323,7 @@ const BulkFamilyUnit = ({
           <Button
             onClick={handleCreate}
             variant="contained"
-            disabled={creating || (!parent1Id && !parent2Id) || selectedChildren.length === 0}
+            disabled={creating || (!parent1 && !parent2) || selectedChildren.length === 0}
             startIcon={creating ? <CircularProgress size={20} /> : <PersonAddIcon />}
           >
             {creating ? 'Creating...' : 'Create Family Unit'}

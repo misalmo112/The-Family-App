@@ -552,12 +552,40 @@ class BulkFamilyUnitView(APIView):
                 {'error': 'Only family admins can create family units'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
+        data = serializer.validated_data
+        parent1_id = data.get('parent1_id')
+        parent2_id = data.get('parent2_id')
+        children_ids = list(data.get('children_ids') or [])
+
+        try:
+            if (data.get('parent1_name') or '').strip():
+                parent1_id = resolve_or_create_person(family, data['parent1_name'].strip()).id
+            if (data.get('parent2_name') or '').strip():
+                parent2_id = resolve_or_create_person(family, data['parent2_name'].strip()).id
+            for name in (data.get('children_names') or []):
+                name = (name or '').strip()
+                if name:
+                    children_ids.append(resolve_or_create_person(family, name).id)
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not parent1_id and not parent2_id:
+            return Response(
+                {'error': 'At least one parent is required (by ID or name).'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not children_ids:
+            return Response(
+                {'error': 'At least one child is required (by IDs or names).'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         result = create_family_unit(
             family,
-            serializer.validated_data.get('parent1_id'),
-            serializer.validated_data.get('parent2_id'),
-            serializer.validated_data['children_ids']
+            parent1_id,
+            parent2_id,
+            children_ids
         )
         
         if result['success']:
